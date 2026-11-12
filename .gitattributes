@@ -1,0 +1,17 @@
+# Retained calibration subtrees are evidence: never apply EOL conversion or
+# filters, so checkout reproduces the exact original bytes and known hashes.
+*.textproto -text whitespace=cr-at-eol
+
+# Repository metadata stays LF.
+/.gitattributes text eol=lf
+/.gitignore text eol=lf
+
+# Canonical JSON and generated site JSON are LF-only.
+*.json text eol=lf
+
+# Source and docs are LF; Windows launchers check out CRLF.
+*.py text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.bat text eol=crlf

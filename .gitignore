@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+
+# Device-specific / private capture payloads
+data/captures/consumer-binaries/
+data/archive/
+artifacts/
+
+# Local scratch
+*.tmp
+.partial
+
+# Generated publication output
+_site/
+viewer/downloads/

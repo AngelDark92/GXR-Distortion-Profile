@@ -1,0 +1,156 @@
+{
+  "adb": "adb",
+  "display_only": true,
+  "failures": [],
+  "identity_after": {
+    "fingerprint": "samsung/xrvst2ue/xrvst2:14/UML2.260301.001/I610UEU2AZF3:user/release-keys",
+    "kernel": "Linux localhost 5.10.240-android12-9-perf-33775878-abI610UEU2AZF3 #1 SMP PREEMPT Fri Jun 12 05:47:10 UTC 2026 aarch64 Toybox",
+    "uid": 0
+  },
+  "identity_before": {
+    "fingerprint": "samsung/xrvst2ue/xrvst2:14/UML2.260301.001/I610UEU2AZF3:user/release-keys",
+    "kernel": "Linux localhost 5.10.240-android12-9-perf-33775878-abI610UEU2AZF3 #1 SMP PREEMPT Fri Jun 12 05:47:10 UTC 2026 aarch64 Toybox",
+    "uid": 0
+  },
+  "output": "data/captures/optical-capture-verified",
+  "probe_after": {
+    "command": "printf '%s' AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+P0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn+AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq+wsbKztLW2t7i5uru8vb6/wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t/g4eLj5OXm5+jp6uvs7e7v8PHy8/T19vf4+fr7/P3+/w== | base64 -d | base64",
+    "encoded_length": 354,
+    "encoded_sha256": "9fafe5ca379da3b9b42be7bdfd9a1192856b76c6e35dd5161609443f306c172f",
+    "expected_length": 256,
+    "expected_sha256": "40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880",
+    "returncode": 0,
+    "status": "verified",
+    "stderr": "",
+    "stdout_length": 256,
+    "stdout_sha256": "40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880",
+    "transport": "base64"
+  },
+  "probe_before": {
+    "command": "printf '%s' AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+P0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn+AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq+wsbKztLW2t7i5uru8vb6/wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t/g4eLj5OXm5+jp6uvs7e7v8PHy8/T19vf4+fr7/P3+/w== | base64 -d | base64",
+    "encoded_length": 354,
+    "encoded_sha256": "9fafe5ca379da3b9b42be7bdfd9a1192856b76c6e35dd5161609443f306c172f",
+    "expected_length": 256,
+    "expected_sha256": "40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880",
+    "returncode": 0,
+    "status": "verified",
+    "stderr": "",
+    "stdout_length": 256,
+    "stdout_sha256": "40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880",
+    "transport": "base64"
+  },
+  "serial": "[redacted]",
+  "transport": "base64",
+  "verified": [
+    {
+      "commands": {
+        "cat": {
+          "command": "base64 /mnt/vendor/efs/device_profile.textproto",
+          "encoded_length": 5782756,
+          "encoded_sha256": "34df149cbd271195cdaa82342e49bc82a8ff1a056815e7b1919607f1a2fbd9c5",
+          "returncode": 0,
+          "stderr": "",
+          "transport": "base64"
+        },
+        "sha256_after": {
+          "command": "sha256sum /mnt/vendor/efs/device_profile.textproto",
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "e7209dcecc174102d12295efb5aaf27a21940c74d0da8bd6610fa0ce2b5f1ac4  /mnt/vendor/efs/device_profile.textproto\r\n"
+        },
+        "sha256_before": {
+          "command": "sha256sum /mnt/vendor/efs/device_profile.textproto",
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "e7209dcecc174102d12295efb5aaf27a21940c74d0da8bd6610fa0ce2b5f1ac4  /mnt/vendor/efs/device_profile.textproto\r\n"
+        },
+        "stat": {
+          "command": "stat -c %s /mnt/vendor/efs/device_profile.textproto",
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "4225860\r\n"
+        },
+        "test_f": {
+          "command": "test -f /mnt/vendor/efs/device_profile.textproto",
+          "returncode": 0,
+          "stderr": "",
+          "stdout": ""
+        }
+      },
+      "identity": {
+        "fingerprint": "samsung/xrvst2ue/xrvst2:14/UML2.260301.001/I610UEU2AZF3:user/release-keys",
+        "kernel": "Linux localhost 5.10.240-android12-9-perf-33775878-abI610UEU2AZF3 #1 SMP PREEMPT Fri Jun 12 05:47:10 UTC 2026 aarch64 Toybox",
+        "uid": 0
+      },
+      "local_path": "data/captures/optical-capture-verified/originals/mnt/vendor/efs/device_profile.textproto.display_profile_v2.textproto",
+      "original_path": "/mnt/vendor/efs/device_profile.textproto",
+      "original_sha_after": "e7209dcecc174102d12295efb5aaf27a21940c74d0da8bd6610fa0ce2b5f1ac4",
+      "original_sha_before": "e7209dcecc174102d12295efb5aaf27a21940c74d0da8bd6610fa0ce2b5f1ac4",
+      "original_size": 4225860,
+      "selected_block_end": 4225858,
+      "selected_block_sha256": "1c6103652760ab2c8cf9521c6cf0f9cffc327e8988c8becebbdf203c834be991",
+      "selected_block_size": 3932405,
+      "selected_block_start": 293453,
+      "selected_capture_not_full_file": true,
+      "sha256": "1c6103652760ab2c8cf9521c6cf0f9cffc327e8988c8becebbdf203c834be991",
+      "size": 3932405,
+      "status": "verified",
+      "transport": "base64"
+    },
+    {
+      "commands": {
+        "cat": {
+          "command": "base64 /vendor/etc/calibration_service/device_profile.textproto",
+          "encoded_length": 5214182,
+          "encoded_sha256": "29cd4f0e8ea10024278c335a242fc78d6e5b15ce2e6ae62b73e68313d518482e",
+          "returncode": 0,
+          "stderr": "",
+          "transport": "base64"
+        },
+        "sha256_after": {
+          "command": "sha256sum /vendor/etc/calibration_service/device_profile.textproto",
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "750af89e6c28127c8f6e1fc24c5911c266ac7da07d82184f8ee2faa966e18c7a  /vendor/etc/calibration_service/device_profile.textproto\r\n"
+        },
+        "sha256_before": {
+          "command": "sha256sum /vendor/etc/calibration_service/device_profile.textproto",
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "750af89e6c28127c8f6e1fc24c5911c266ac7da07d82184f8ee2faa966e18c7a  /vendor/etc/calibration_service/device_profile.textproto\r\n"
+        },
+        "stat": {
+          "command": "stat -c %s /vendor/etc/calibration_service/device_profile.textproto",
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "3810361\r\n"
+        },
+        "test_f": {
+          "command": "test -f /vendor/etc/calibration_service/device_profile.textproto",
+          "returncode": 0,
+          "stderr": "",
+          "stdout": ""
+        }
+      },
+      "identity": {
+        "fingerprint": "samsung/xrvst2ue/xrvst2:14/UML2.260301.001/I610UEU2AZF3:user/release-keys",
+        "kernel": "Linux localhost 5.10.240-android12-9-perf-33775878-abI610UEU2AZF3 #1 SMP PREEMPT Fri Jun 12 05:47:10 UTC 2026 aarch64 Toybox",
+        "uid": 0
+      },
+      "local_path": "data/captures/optical-capture-verified/originals/vendor/etc/calibration_service/device_profile.textproto.display_profile_v2.textproto",
+      "original_path": "/vendor/etc/calibration_service/device_profile.textproto",
+      "original_sha_after": "750af89e6c28127c8f6e1fc24c5911c266ac7da07d82184f8ee2faa966e18c7a",
+      "original_sha_before": "750af89e6c28127c8f6e1fc24c5911c266ac7da07d82184f8ee2faa966e18c7a",
+      "original_size": 3810361,
+      "selected_block_end": 3810357,
+      "selected_block_sha256": "3247e01abfc0a4f26211364dcb3627a7eab4f33c796006d09e38c337dc1fd773",
+      "selected_block_size": 3513265,
+      "selected_block_start": 297092,
+      "selected_capture_not_full_file": true,
+      "sha256": "3247e01abfc0a4f26211364dcb3627a7eab4f33c796006d09e38c337dc1fd773",
+      "size": 3513265,
+      "status": "verified",
+      "transport": "base64"
+    }
+  ]
+}

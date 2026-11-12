@@ -1,0 +1,2816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Galaxy XR Optical LUT Viewer</title>
+<style>
+:root {
+  color-scheme: dark light;
+  --bg: #0b0d10;
+  --surface: #12151c;
+  --panel: #1a1f27;
+  --panel-2: #232a36;
+  --text: #eef1f5;
+  --muted: #99a1ad;
+  --accent: #67e8f9;
+  --accent-2: #f0abfc;
+  --danger: #f87171;
+  --success: #86efac;
+  --warn: #fbbf24;
+  --border: #2a3242;
+  --ring: rgba(103,232,249,0.35);
+  --shadow: 0 16px 50px rgba(0,0,0,0.45);
+  --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f8f9fb;
+    --surface: #fff;
+    --panel: #f1f3f7;
+    --panel-2: #e4e7ec;
+    --text: #171b21;
+    --muted: #5b636e;
+    --border: #d6dbe1;
+    --shadow: 0 16px 50px rgba(0,0,0,0.08);
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+header { padding: 1.5rem 2rem; border-bottom: 1px solid var(--border); background: var(--surface); }
+header h1 { margin: 0; font-size: 1.55rem; letter-spacing: -0.02em; font-weight: 700; }
+.tagline { margin: .35rem 0 0; color: var(--muted); font-size: .9rem; }
+.provenance { margin-top: .5rem; display: flex; flex-wrap: wrap; gap: 1.25rem; font-size: .78rem; color: var(--muted); }
+.provenance-details { margin-top: .75rem; font-size: .8rem; color: var(--muted); }
+.provenance-details > summary { cursor: pointer; color: var(--muted); }
+.provenance-details > summary:hover { color: var(--text); }
+.provenance-details[open] > summary { color: var(--text); }
+.provenance .prof {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: .5rem;
+  padding: .75rem 1rem;
+  min-width: 220px;
+  flex: 1 1 280px;
+}
+.provenance .prof strong { color: var(--text); }
+.provenance code { display: block; font-family: var(--font-mono); word-break: break-all; color: var(--text); margin-top: .2rem; }
+.controls {
+  padding: 1rem 2rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+}
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: .6rem;
+  padding: .4rem .7rem;
+  min-width: 0;
+}
+.group-label { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+button {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: .45rem;
+  padding: .45rem .75rem;
+  font: inherit;
+  font-size: .85rem;
+  cursor: pointer;
+  transition: transform .08s, background .15s, border-color .15s, box-shadow .15s;
+}
+button:hover { background: var(--accent); color: #081016; border-color: var(--accent); }
+button[aria-pressed="true"] { background: var(--accent); color: #081016; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); font-weight: 600; }
+button[aria-pressed="true"]:hover { background: #4dd0e1; }
+button:disabled { opacity: .4; cursor: not-allowed; }
+input[type="range"] { accent-color: var(--accent); width: 100px; }
+input[type="file"] { font-size: .78rem; color: var(--muted); max-width: 220px; }
+.file-label { font-size: .72rem; color: var(--muted); }
+.view {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 1rem;
+  padding: 1rem 2rem;
+  min-height: 0;
+  max-height: calc(100vh - 260px);
+}
+@media (max-width: 900px) {
+  .view { grid-template-columns: 1fr; max-height: none; }
+  .controls { padding: 1rem; }
+  header { padding: 1rem; }
+}
+@media (max-width: 480px) {
+  .control-group { flex-wrap: wrap; }
+  .control-group input[type="file"] { max-width: 100%; }
+  .control-group .file-label { max-width: 100%; }
+  .control-group button { white-space: normal; }
+}
+.canvas-wrap {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: .75rem;
+  box-shadow: var(--shadow);
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#plot { width: 100%; height: 100%; min-height: 280px; border-radius: .75rem; touch-action: none; display: block; cursor: grab; }
+#plot.dragging { cursor: grabbing; }
+#plot:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.interaction-hint { padding: .5rem 2rem 0; margin: 0; color: var(--muted); font-size: .75rem; }
+@media (max-width: 900px) { .interaction-hint { padding: .5rem 1rem 0; } }
+.overlay {
+  position: absolute;
+  top: .75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(11,13,16,0.78);
+  color: #fff;
+  padding: .5rem .75rem;
+  border-radius: .5rem;
+  font-size: .78rem;
+  max-width: min(420px, 62%);
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255,255,255,0.08);
+  z-index: 2;
+}
+@media (prefers-color-scheme: light) {
+  .overlay { background: rgba(255,255,255,0.9); color: var(--text); border-color: var(--border); }
+}
+.zoom-readout {
+  position: absolute;
+  top: .75rem;
+  right: 9.15rem;
+  background: rgba(11,13,16,0.78);
+  color: #fff;
+  padding: .35rem .65rem;
+  border-radius: .5rem;
+  font-size: .78rem;
+  pointer-events: none;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+@media (prefers-color-scheme: light) {
+  .zoom-readout { background: rgba(255,255,255,0.9); color: var(--text); border-color: var(--border); }
+}
+.canvas-tools {
+  position: absolute;
+  top: .75rem;
+  right: .75rem;
+  display: flex;
+  gap: .4rem;
+}
+.canvas-tools button {
+  font-size: .75rem;
+  padding: .35rem .55rem;
+  background: rgba(11,13,16,0.78);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.12);
+}
+.canvas-tools button:hover { background: var(--accent); color: #081016; }
+@media (prefers-color-scheme: light) {
+  .canvas-tools button { background: rgba(255,255,255,0.9); color: var(--text); border-color: var(--border); }
+}
+.info-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: .75rem;
+  padding: 1rem;
+  box-shadow: var(--shadow);
+  overflow: auto;
+  min-height: 200px;
+}
+.info-panel h2 { margin: 0 0 .75rem; font-size: 1.05rem; }
+.info-grid { display: grid; grid-template-columns: auto 1fr; gap: .35rem .9rem; font-size: .82rem; }
+.info-grid dt { color: var(--muted); }
+.info-grid dd { margin: 0; font-family: var(--font-mono); word-break: break-word; }
+.info-note {
+  margin-top: .75rem;
+  padding: .5rem;
+  border-left: 3px solid var(--accent);
+  background: var(--panel-2);
+  font-size: .78rem;
+  color: var(--muted);
+}
+.selection-box {
+  position: absolute;
+  border: 1px dashed var(--accent);
+  background: rgba(103,232,249,0.12);
+  pointer-events: none;
+  display: none;
+}
+.region-summary {
+  margin-top: .75rem;
+  padding: .6rem;
+  border: 1px solid var(--border);
+  border-radius: .5rem;
+  background: var(--panel-2);
+  font-size: .8rem;
+}
+.region-summary h3 { margin: 0 0 .4rem; font-size: .88rem; }
+.region-summary .actions { margin-top: .5rem; display: flex; gap: .4rem; }
+.notes { padding: 1rem 2rem 2rem; }
+.notes h2 { font-size: 1.05rem; margin-bottom: .5rem; }
+#limitations { margin: 0 0 .75rem; padding-left: 1.2rem; font-size: .85rem; color: var(--muted); }
+#limitations li { margin-bottom: .35rem; }
+.privacy, .no-edit { font-size: .82rem; color: var(--muted); margin: .3rem 0; }
+.privacy strong, .no-edit strong { color: var(--text); }
+footer { padding: .75rem 2rem; border-top: 1px solid var(--border); color: var(--muted); font-size: .72rem; }
+.fatal { padding: 2rem; color: var(--danger); font-weight: 600; }
+.pill { display: inline-block; padding: .05rem .4rem; border-radius: .25rem; background: var(--panel-2); font-size: .72rem; }
+.downloads { padding: 1rem 2rem 2rem; }
+.downloads h2 { font-size: 1.05rem; margin-bottom: .5rem; }
+.download-intro { margin: 0 0 .75rem; font-size: .85rem; color: var(--muted); }
+.download-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: .75rem; margin: 0; padding: 0; list-style: none; }
+.download-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: .75rem;
+  padding: .9rem 1rem;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+}
+.download-card .label { font-size: .9rem; font-weight: 600; color: var(--text); }
+.download-card .desc { font-size: .78rem; color: var(--muted); line-height: 1.45; }
+.download-card .desc code { font-family: var(--font-mono); font-size: .75rem; background: var(--panel-2); padding: .05rem .25rem; border-radius: .25rem; }
+.download-card .meta { font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.download-btn {
+  align-self: flex-start;
+  display: inline-block;
+  margin-top: .3rem;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: .45rem;
+  padding: .45rem .75rem;
+  font: inherit;
+  font-size: .85rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform .08s, background .15s, border-color .15s, box-shadow .15s;
+}
+.download-btn:hover { background: var(--accent); color: #081016; border-color: var(--accent); }
+.download-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 900px) { .downloads { padding: 1rem 1rem 2rem; } }
+</style>
+<link rel="icon" href="data:,">
+</head>
+<body>
+<header>
+  <h1>Galaxy XR Optical LUT Viewer</h1>
+  <p class="tagline">Offline, local-only visualization of factory and vendor optical LUT samples. The original factory LUT is not modified.</p>
+  <details class="provenance-details">
+    <summary>Data sources, hashes and LUT fill</summary>
+    <div class="provenance" id="provenance"></div>
+  </details>
+</header>
+
+<section class="controls" aria-label="Visualization controls">
+  <div class="control-group" role="group" aria-label="Eye selection">
+    <span class="group-label">Eye</span>
+    <button type="button" data-eye="left" aria-pressed="false">Left</button>
+    <button type="button" data-eye="right" aria-pressed="false">Right</button>
+    <button type="button" data-eye="both" aria-pressed="true">Both</button>
+  </div>
+  <div class="control-group" role="group" aria-label="Profile selection">
+    <span class="group-label">Profile</span>
+    <button type="button" data-profile="factory" aria-pressed="true">Factory</button>
+    <button type="button" data-profile="vendor" aria-pressed="false" id="btn-vendor">Vendor</button>
+    <button type="button" data-profile="both" aria-pressed="false" id="btn-both">Both</button>
+  </div>
+  <div class="control-group" role="group" aria-label="Color channel selection">
+    <span class="group-label">Channel</span>
+    <button type="button" data-channel="rgb" aria-pressed="true">RGB overlay</button>
+    <button type="button" data-channel="red" aria-pressed="false">Red</button>
+    <button type="button" data-channel="green" aria-pressed="false">Green</button>
+    <button type="button" data-channel="blue" aria-pressed="false">Blue</button>
+  </div>
+  <div class="control-group" role="group" aria-label="Projection mode">
+    <span class="group-label">Projection</span>
+    <button type="button" data-projection="xy" aria-pressed="true">Raw X / Y</button>
+    <button type="button" data-projection="ratio" aria-pressed="false">X/(-Z), Y/(-Z)</button>
+  </div>
+  <div class="control-group" role="group" aria-label="View mode">
+    <span class="group-label">View</span>
+    <button type="button" data-view="points" aria-pressed="true">Points</button>
+    <button type="button" data-view="grid" aria-pressed="false">Mapped grid</button>
+    <button type="button" data-view="raw" aria-pressed="false">Raw input grid</button>
+    <button type="button" data-view="lattice" aria-pressed="false">Lattice on panel</button>
+    <button type="button" data-view="diff" aria-pressed="false" id="btn-diff">Factory-vendor diff</button>
+  </div>
+  <div class="control-group" role="group" aria-label="Lattice placement" id="placement-group">
+    <span class="group-label">Placement</span>
+    <button type="button" data-placement="panel" aria-pressed="false">Panel (u,v)</button>
+    <button type="button" data-placement="ray" aria-pressed="true">Ray (X/-Z, Y/-Z)</button>
+  </div>
+  <div class="control-group" role="group" aria-label="Lattice stride" id="stride-group">
+    <span class="group-label">Lattice stride</span>
+    <button type="button" data-stride="1" aria-pressed="false">1</button>
+    <button type="button" data-stride="2" aria-pressed="false">2</button>
+    <button type="button" data-stride="4" aria-pressed="true">4</button>
+    <button type="button" data-stride="8" aria-pressed="false">8</button>
+  </div>
+  <div class="control-group" role="group" aria-label="Color mapping">
+    <span class="group-label">Color by</span>
+    <button type="button" data-colorby="channel" aria-pressed="true">Channel</button>
+    <button type="button" data-colorby="z" aria-pressed="false">Raw Z value</button>
+    <button type="button" data-colorby="diffmag" aria-pressed="false" id="btn-diffmag">|ΔXYZ|</button>
+  </div>
+  <div class="control-group" role="group" aria-label="Drawing style">
+    <label class="group-label" for="point-size">Point size</label>
+    <input id="point-size" type="range" min="0.5" max="6" step="0.5" value="2" aria-label="Point size">
+    <label class="group-label" for="opacity">Opacity</label>
+    <input id="opacity" type="range" min="0.1" max="1" step="0.05" value="0.8" aria-label="Opacity">
+  </div>
+  <div class="control-group" role="group" aria-label="Load local JSON">
+    <label class="file-label" for="json-file">Load later analysis JSON (optional, local-only)</label>
+    <input id="json-file" type="file" accept=".json,application/json" aria-label="Load another local analysis JSON file from this device">
+  </div>
+</section>
+
+<p class="interaction-hint" id="interaction-hint">Drag a panel with the left or right mouse button to pan it · wheel or pinch to zoom that panel · Shift+drag to select a region · double-click to zoom, Shift+double-click to reset that panel.</p>
+
+<main class="view" id="main-view">
+  <div class="canvas-wrap" id="canvas-wrap">
+    <canvas id="plot" tabindex="0" role="img" aria-label="Optical LUT projection plot with one panel per eye. Drag a panel to pan it, wheel or pinch to zoom that panel, Shift+drag to select a region, double-click to zoom, Shift+double-click to reset. With the canvas focused, plus and minus zoom and 0 resets. Hover or tap a sample to inspect raw UV, XYZ, and lattice placement. The LUT data is embedded in the page; nothing is uploaded or sent elsewhere."></canvas>
+    <div id="overlay" class="overlay" aria-live="polite" style="display:none"></div>
+    <div id="zoom-readout" class="zoom-readout">1.0x</div>
+    <div class="canvas-tools" id="canvas-tools">
+      <button type="button" id="btn-reset" title="Reset view (0)">Reset view</button>
+      <button type="button" id="btn-png" title="Export PNG">PNG</button>
+    </div>
+    <div id="selection-box" class="selection-box"></div>
+    <noscript><p class="fatal">JavaScript is required to render this viewer.</p></noscript>
+  </div>
+  <aside class="info-panel" aria-label="Inspector">
+    <h2>Inspect</h2>
+    <div id="inspect-content">Hover or tap a cell to inspect raw UV and stored XYZ values.</div>
+  </aside>
+</main>
+
+<section class="notes" aria-label="Limitations and provenance notes">
+  <h2>Limitations &amp; provenance</h2>
+  <ul id="limitations"></ul>
+  <p class="privacy"><strong>Privacy:</strong> This viewer renders the embedded LUT data locally in your browser. It does not upload data, send telemetry, or load external assets. If you open the hosted page or click downloads, ordinary web requests to serve those files apply; the offline package works without any network.</p>
+  <p class="no-edit"><strong>No apply/edit control:</strong> This tool only reads and visualizes the embedded LUT data. It cannot write, flash, or otherwise change the original factory source.</p>
+</section>
+
+<section class="downloads" aria-label="Downloads">
+  <h2>Downloads</h2>
+  <p class="download-intro">These files are bundled with this package. When opened locally, downloads require no network. On the hosted page, clicking a download link fetches the file as a normal web request.</p>
+  <ul class="download-list">
+    <li class="download-card">
+      <span class="label">Factory display profile v2</span>
+      <span class="desc">Device-specific, original-format extracted <code>display_profile_v2</code> subtree. Not the full <code>device_profile.textproto</code> and not a flashable image.</span>
+      <span class="meta">TextProto</span>
+      <a href="downloads/factory-display-profile-v2.textproto" download class="download-btn">Download factory profile</a>
+    </li>
+    <li class="download-card">
+      <span class="label">Vendor display profile v2</span>
+      <span class="desc">Average/aggregate vendor LUT, original-format extracted <code>display_profile_v2</code> subtree. Not the full <code>device_profile.textproto</code> and not a flashable image.</span>
+      <span class="meta">TextProto</span>
+      <a href="downloads/vendor-display-profile-v2.textproto" download class="download-btn">Download vendor profile</a>
+    </li>
+    <li class="download-card">
+      <span class="label">Analysis JSON</span>
+      <span class="desc">Full structured analysis used by this viewer, including decoded cells and metadata.</span>
+      <span class="meta">JSON</span>
+      <a href="downloads/analysis.json" download class="download-btn">Download analysis JSON</a>
+    </li>
+    <li class="download-card">
+      <span class="label">Provenance manifest</span>
+      <span class="desc">Source paths, extraction hashes, and generation metadata for reproducibility.</span>
+      <span class="meta">JSON</span>
+      <a href="downloads/provenance.json" download class="download-btn">Download provenance</a>
+    </li>
+    <li class="download-card">
+      <span class="label">SHA256 checksums</span>
+      <span class="desc">Checksums for the downloadable files in this package.</span>
+      <span class="meta">SHA256SUMS</span>
+      <a href="downloads/SHA256SUMS" download class="download-btn">Download checksums</a>
+    </li>
+  </ul>
+</section>
+
+<footer>
+  Generated <span id="gen-time"></span> by <span id="gen-tool"></span>.
+</footer>
+
+<script type="application/json" id="analysis-data">
+{{ANALYSIS_DATA}}
+</script>
+
+<script>
+(function() {
+  'use strict';
+
+  const CHANNELS = ['blue', 'green', 'red'];
+  const CHANNEL_COLORS = { red: '#ef4444', green: '#22c55e', blue: '#3b82f6' };
+  const CHANNEL_DRAW_ORDER = ['blue', 'green', 'red'];
+  const EYE_LABELS = { left: 'Left eye', right: 'Right eye' };
+  const PROFILE_COLORS = { factory: '#67e8f9', vendor: '#f0abfc' };
+
+  const canvas = document.getElementById('plot');
+  const wrap = document.getElementById('canvas-wrap');
+  const overlay = document.getElementById('overlay');
+  const inspect = document.getElementById('inspect-content');
+  const provenance = document.getElementById('provenance');
+  const limitationsEl = document.getElementById('limitations');
+  const genTime = document.getElementById('gen-time');
+  const genTool = document.getElementById('gen-tool');
+  const mainView = document.getElementById('main-view');
+  const zoomReadout = document.getElementById('zoom-readout');
+  const selectionBox = document.getElementById('selection-box');
+  const btnReset = document.getElementById('btn-reset');
+  const btnPng = document.getElementById('btn-png');
+
+  const state = {
+    eye: 'both',
+    profile: 'both',
+    channel: 'rgb',
+    projection: 'xy',
+    view: 'points',
+    placement: 'ray',
+    colorBy: 'channel',
+    pointSize: 2,
+    opacity: 0.8,
+    latticeStride: 4
+  };
+
+  let analysis = null;
+  let processed = null;
+  let ctx = canvas.getContext('2d', { alpha: false });
+  let primitives = [];
+  let primCount = 0;
+  let primOX = 0, primOY = 0;
+  let hitIndex = { cell: 32, cols: 0, rows: 0, buckets: [] };
+  let themeCache = null;
+  let wrapSize = null;
+  let rangeCache = { key: '', map: new Map() };
+  let geometryCache = { key: '', data: null };
+  let paneBaseCache = { key: '', map: new Map() };
+  let resizeTimer = null;
+
+  let hoverPos = { x: null, y: null };
+  let hoverRaf = 0;
+  let selected = null;
+  let drag = { active: false, pointerId: null, eye: null, button: 0, mode: 'pan', startX: 0, startY: 0, lastX: 0, lastY: 0, moved: false, selecting: false };
+  let pinch = null;
+  const pointers = new Map();
+  let renderRaf = 0;
+  let renderCount = 0;
+  let regionSamples = [];
+
+  const ZOOM_MIN = 0.25;
+  const ZOOM_MAX = 64;
+  const KEEP_VISIBLE = 40;
+
+  const paneViews = {
+    left: { zoom: 1, panX: 0, panY: 0, baseScale: 1, baseOffX: 0, baseOffY: 0, rangeX: 1, rangeY: 1 },
+    right: { zoom: 1, panX: 0, panY: 0, baseScale: 1, baseOffX: 0, baseOffY: 0, rangeX: 1, rangeY: 1 }
+  };
+
+  function fmt(n) {
+    if (n === null || n === undefined || !Number.isFinite(n)) return '—';
+    return (+n).toExponential(4);
+  }
+
+  function fmtDec(n) {
+    if (n === null || n === undefined || !Number.isFinite(n)) return '—';
+    return (+n).toFixed(2);
+  }
+
+  function fmtInt(n) {
+    if (n === null || n === undefined || !Number.isFinite(n)) return '—';
+    return Math.round(+n).toString();
+  }
+
+  // Theme variables are read once per frame: getComputedStyle forces a style
+  // resolution, and the draw code asks for the same handful of values
+  // thousands of times per second.
+  function primeTheme() {
+    const cs = getComputedStyle(document.documentElement);
+    themeCache = {
+      '--text': cs.getPropertyValue('--text').trim() || '#e6edf3',
+      '--muted': cs.getPropertyValue('--muted').trim() || '#8b98a5',
+      '--border': cs.getPropertyValue('--border').trim() || '#30363d',
+      '--panel': cs.getPropertyValue('--panel').trim() || '#0d1117',
+      '--font-body': cs.getPropertyValue('--font-body').trim() || 'system-ui, sans-serif'
+    };
+  }
+
+  function getCss(name) {
+    if (themeCache && themeCache[name] !== undefined) return themeCache[name];
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#000';
+  }
+
+  function measureWrap() {
+    wrapSize = { w: wrap.clientWidth, h: wrap.clientHeight };
+    return wrapSize;
+  }
+
+  let lastWrap = null;
+  function syncWrap() {
+    const size = measureWrap();
+    if (lastWrap && size.w === lastWrap.w && size.h === lastWrap.h) return;
+    lastWrap = { w: size.w, h: size.h };
+    scheduleRender();
+  }
+
+  function measureWrapLines(ctx, text, maxWidth) {
+    const words = text.split(' ');
+    const lines = [];
+    let line = '';
+    for (let n = 0; n < words.length; n++) {
+      const testLine = line ? line + ' ' + words[n] : words[n];
+      if (ctx.measureText(testLine).width <= maxWidth || !line) {
+        line = testLine;
+      } else {
+        lines.push(line.trim());
+        line = words[n];
+      }
+      while (ctx.measureText(line).width > maxWidth) {
+        let cut = line.length - 1;
+        while (cut > 1 && ctx.measureText(line.slice(0, cut) + '-').width > maxWidth) cut--;
+        if (cut <= 1) cut = Math.max(1, Math.floor(line.length / 2));
+        lines.push(line.slice(0, cut) + '-');
+        line = line.slice(cut);
+      }
+    }
+    if (line.trim()) lines.push(line.trim());
+    return lines;
+  }
+
+  function fail(msg) {
+    mainView.textContent = '';
+    const p = document.createElement('p');
+    p.className = 'fatal';
+    p.textContent = msg;
+    mainView.appendChild(p);
+    document.querySelector('.controls').setAttribute('aria-hidden', 'true');
+  }
+
+  function parseData() {
+    const el = document.getElementById('analysis-data');
+    if (!el) { fail('No embedded analysis data found.'); return false; }
+    const raw = el.textContent.trim();
+    if (!raw || raw === '{{ANALYSIS_DATA}}') {
+      fail('This is viewer_template.html, the unbuilt source of the viewer: it has no embedded LUT data, so nothing can render and the controls stay inert. Build it first with "python -B build_viewer.py data\\analysis.json -o viewer\\optics-viewer.html", then open viewer/optics-viewer.html.');
+      return false;
+    }
+    try {
+      analysis = JSON.parse(raw);
+    } catch (e) {
+      fail('Could not parse embedded analysis data: ' + e.message);
+      return false;
+    }
+    if (!analysis || analysis.schema_version !== 1) {
+      fail('Unsupported analysis schema. Expected schema_version 1.');
+      return false;
+    }
+    return true;
+  }
+
+  function validateIncoming(data) {
+    if (!data || data.schema_version !== 1) return 'Unsupported schema version.';
+    const profiles = data.profiles;
+    if (!profiles || typeof profiles !== 'object') return 'Missing profiles object.';
+    if (!profiles.factory) return 'Required factory profile is missing.';
+    for (const pname of ['factory', 'vendor']) {
+      const p = profiles[pname];
+      if (!p) continue;
+      if (typeof p !== 'object') return 'profiles.' + pname + ' is not an object.';
+      for (const k of ['source_path', 'source_sha256', 'block_sha256']) {
+        if (typeof p[k] !== 'string' || p[k].length === 0) return 'profiles.' + pname + '.' + k + ' must be a non-empty string.';
+      }
+      for (const sname of ['left', 'right']) {
+        const side = p[sname];
+        if (!side) return pname + '.' + sname + ': missing.';
+        const dims = ['rows', 'cols', 'width_px', 'height_px'];
+        for (const k of dims) {
+          const v = side[k];
+          if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0 || Math.floor(v) !== v) return pname + '.' + sname + '.' + k + ' must be a positive integer.';
+        }
+        const ipd = side.ipd_mm;
+        if (typeof ipd !== 'number' || !Number.isFinite(ipd) || ipd <= 0) return pname + '.' + sname + '.ipd_mm must be positive finite.';
+        for (const k of ['lut_block_count', 'empty_lut_blocks']) {
+          const v = side[k];
+          if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || Math.floor(v) !== v) return pname + '.' + sname + '.' + k + ' must be a non-negative integer.';
+        }
+        if (!Array.isArray(side.cells)) return pname + '.' + sname + '.cells is not an array.';
+        const expected = side.rows * side.cols;
+        if (side.cells.length !== expected) return pname + '.' + sname + '.cells length ' + side.cells.length + ' != rows*cols ' + expected + '; populated LUT must be complete.';
+        const seen = new Map();
+        for (let i = 0; i < side.cells.length; i++) {
+          const c = side.cells[i];
+          if (!c || typeof c !== 'object') return pname + '.' + sname + '.cells[' + i + '] invalid.';
+          if (typeof c.u !== 'number' || !Number.isFinite(c.u) || typeof c.v !== 'number' || !Number.isFinite(c.v)) return pname + '.' + sname + '.cells[' + i + '] has non-finite UV.';
+          const uvKey = c.u + ',' + c.v;
+          if (seen.has(uvKey)) return pname + '.' + sname + '.cells[' + i + '] duplicate UV ' + uvKey + ' (first at ' + seen.get(uvKey) + ').';
+          seen.set(uvKey, i);
+          for (const ch of CHANNELS) {
+            const arr = c[ch];
+            if (!Array.isArray(arr) || arr.length !== 3) return pname + '.' + sname + '.cells[' + i + '].' + ch + ' missing or not [x,y,z].';
+            for (let j = 0; j < 3; j++) {
+              const comp = arr[j];
+              if (typeof comp !== 'number' || !Number.isFinite(comp)) return pname + '.' + sname + '.cells[' + i + '].' + ch + '[' + j + '] non-finite number.';
+            }
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  function computeGridPosition(c, cols, rows) {
+    if (Number.isInteger(c.id_x) && Number.isInteger(c.id_y)) {
+      return { gx: c.id_x, gy: c.id_y };
+    }
+    return null;
+  }
+
+  function inferGridPositions(cells, cols, rows) {
+    const sortedU = Array.from(new Set(cells.map(c => c.u).filter(Number.isFinite))).sort((a,b)=>a-b);
+    const sortedV = Array.from(new Set(cells.map(c => c.v).filter(Number.isFinite))).sort((a,b)=>a-b);
+    if (sortedU.length > 0 && sortedV.length > 0) {
+      cells.forEach(c => {
+        if (c.gx != null) return;
+        const ix = sortedU.indexOf(c.u);
+        const iy = sortedV.indexOf(c.v);
+        if (ix >= 0 && iy >= 0 && ix < cols && iy < rows) {
+          c.gx = ix; c.gy = iy;
+        }
+      });
+    }
+  }
+
+  // Grid indices are stored zero-centred in the factory LUT (for example
+  // -36..36) while the vendor LUT has no ids at all. Normalise everything to
+  // 0..cols-1 / 0..rows-1 so the reference grid, stride decimation and edge
+  // rows all agree regardless of the source numbering.
+  function normalizeGridPositions(cells, cols, rows) {
+    let minX = null, minY = null;
+    for (const c of cells) {
+      if (!Number.isInteger(c.id_x) || !Number.isInteger(c.id_y)) continue;
+      if (minX === null || c.id_x < minX) minX = c.id_x;
+      if (minY === null || c.id_y < minY) minY = c.id_y;
+    }
+    if (minX !== null && minY !== null) {
+      for (const c of cells) {
+        if (!Number.isInteger(c.id_x) || !Number.isInteger(c.id_y)) continue;
+        c.gx = c.id_x - minX;
+        c.gy = c.id_y - minY;
+      }
+    }
+    let missing = false;
+    for (const c of cells) {
+      if (c.gx == null || c.gy == null) { missing = true; break; }
+    }
+    if (missing) inferGridPositions(cells, cols, rows);
+  }
+
+  function preprocess(data) {
+    const profiles = {};
+    const hasProfile = {};
+    for (const pname of ['factory', 'vendor']) {
+      const p = data.profiles[pname];
+      if (!p) continue;
+      hasProfile[pname] = true;
+      profiles[pname] = {};
+      for (const ename of ['left', 'right']) {
+        const side = p[ename];
+        if (!side || !Array.isArray(side.cells)) continue;
+        const cells = side.cells.map((c, idx) => {
+          const key = c.u + ',' + c.v;
+          const derived = {};
+          for (const ch of CHANNELS) {
+            const arr = c[ch];
+            if (!Array.isArray(arr) || arr.length !== 3) continue;
+            const [x, y, z] = arr;
+            derived[ch] = {
+              xy: { x: x, y: y, valid: Number.isFinite(x) && Number.isFinite(y) },
+              ratio: { x: (z !== 0 && Number.isFinite(z)) ? (x / (-z)) : null, y: (z !== 0 && Number.isFinite(z)) ? (y / (-z)) : null, valid: z !== 0 && Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z) }
+            };
+          }
+          return { u: c.u, v: c.v, id_x: c.id_x, id_y: c.id_y, key: key, idx: idx, raw: c, derived: derived };
+        });
+        normalizeGridPositions(cells, side.cols || 1, side.rows || 1);
+        profiles[pname][ename] = Object.assign({}, side, { cells: cells });
+      }
+    }
+
+    const matched = { left: [], right: [] };
+    if (profiles.factory && profiles.vendor) {
+      for (const ename of ['left', 'right']) {
+        const fc = profiles.factory[ename]?.cells || [];
+        const vc = profiles.vendor[ename]?.cells || [];
+        if (!fc.length || !vc.length) continue;
+        const fmap = new Map(fc.map(c => [c.key, c]));
+        const vmap = new Map(vc.map(c => [c.key, c]));
+        for (const k of fmap.keys()) {
+          if (vmap.has(k)) matched[ename].push({ key: k, factory: fmap.get(k), vendor: vmap.get(k) });
+        }
+      }
+    }
+    return { profiles, hasProfile, matched };
+  }
+
+  function activeProfiles() {
+    const avail = [];
+    if (processed.hasProfile.factory) avail.push('factory');
+    if (processed.hasProfile.vendor) avail.push('vendor');
+    if (state.profile === 'both') return avail;
+    if (avail.indexOf(state.profile) >= 0) return [state.profile];
+    return avail.slice(0, 1);
+  }
+
+  function activeChannels() {
+    if (state.channel === 'rgb') return CHANNEL_DRAW_ORDER;
+    return [state.channel];
+  }
+
+  function projectionPoint(cell, ch) {
+    const d = cell.derived[ch];
+    if (!d) return null;
+    return state.projection === 'xy' ? d.xy : d.ratio;
+  }
+
+  function colorFor(cell, ch, zmin, zmax) {
+    if (state.colorBy === 'channel') return CHANNEL_COLORS[ch];
+    const arr = cell.raw[ch];
+    if (!arr || arr.length < 3) return '#888';
+    const z = arr[2];
+    if (!Number.isFinite(z) || zmin === null || zmax === null || zmin === zmax) return '#888';
+    const t = Math.max(0, Math.min(1, (z - zmin) / (zmax - zmin)));
+    const hue = (1 - t) * 220;
+    return 'hsl(' + hue + ', 80%, 55%)';
+  }
+
+  function diffMagnitude(cell, ch) {
+    const f = cell.factory.raw[ch];
+    const v = cell.vendor.raw[ch];
+    if (!f || !v || f.length !== 3 || v.length !== 3) return null;
+    const dx = f[0] - v[0], dy = f[1] - v[1], dz = f[2] - v[2];
+    return Math.hypot(dx, dy, dz);
+  }
+
+  function profileMarker(ctx, sx, sy, size, profile) {
+    if (profile === 'factory') {
+      ctx.beginPath(); ctx.arc(sx, sy, size, 0, Math.PI * 2); ctx.fill();
+    } else {
+      ctx.fillRect(sx - size, sy - size, size * 2, size * 2);
+    }
+  }
+
+  function uvBounds(eye) {
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const pname of activeProfiles()) {
+      const cells = processed.profiles[pname]?.[eye]?.cells || [];
+      for (const c of cells) {
+        if (!Number.isFinite(c.u) || !Number.isFinite(c.v)) continue;
+        if (c.u < x0) x0 = c.u;
+        if (c.u > x1) x1 = c.u;
+        if (c.v < y0) y0 = c.v;
+        if (c.v > y1) y1 = c.v;
+      }
+    }
+    if (!Number.isFinite(x0) || !Number.isFinite(y0) || x0 === x1 || y0 === y1) return null;
+    return { x0: x0, x1: x1, y0: y0, y1: y1 };
+  }
+
+  function computePaneBase(eye, pw, ph) {
+    const cacheKey = geometryKey() + '|' + Math.round(pw) + 'x' + Math.round(ph);
+    if (paneBaseCache.key !== cacheKey) paneBaseCache = { key: cacheKey, map: new Map() };
+    if (paneBaseCache.map.has(eye)) return paneBaseCache.map.get(eye);
+    const profs = activeProfiles();
+    const channels = activeChannels();
+    const side = profs.length ? (processed.profiles[profs[0]][eye] || processed.profiles[profs[0]].left) : null;
+    const widthPx = side ? (side.width_px || 1) : 1;
+    const heightPx = side ? (side.height_px || 1) : 1;
+
+    let x0 = 0, x1 = widthPx, y0 = 0, y1 = heightPx;
+
+    if (state.view === 'lattice') {
+      if (state.placement === 'panel') {
+        const uv = uvBounds(eye);
+        if (uv) { x0 = uv.x0; x1 = uv.x1; y0 = uv.y0; y1 = uv.y1; }
+        else { x0 = -widthPx / 2; x1 = widthPx / 2; y0 = -heightPx / 2; y1 = heightPx / 2; }
+      } else {
+        x0 = -widthPx / 2; x1 = widthPx / 2;
+        y0 = -heightPx / 2; y1 = heightPx / 2;
+      }
+    } else if (state.view === 'raw') {
+      const uv = uvBounds(eye);
+      if (uv) { x0 = uv.x0; x1 = uv.x1; y0 = uv.y0; y1 = uv.y1; }
+    } else if (state.view !== 'diff') {
+      x0 = Infinity; x1 = -Infinity; y0 = Infinity; y1 = -Infinity;
+      let any = false;
+      for (const pname of profs) {
+        const cells = processed.profiles[pname][eye]?.cells || [];
+        for (const c of cells) {
+          for (const ch of channels) {
+            const pt = projectionPoint(c, ch);
+            if (pt && pt.valid) {
+              x0 = Math.min(x0, pt.x); x1 = Math.max(x1, pt.x);
+              y0 = Math.min(y0, pt.y); y1 = Math.max(y1, pt.y);
+              any = true;
+            }
+          }
+        }
+      }
+      if (!any) { x0 = 0; x1 = 1; y0 = 0; y1 = 1; }
+    }
+
+    const pad = 28;
+    const innerW = Math.max(1, pw - pad * 2);
+    const innerH = Math.max(1, ph - pad * 2);
+
+    let label;
+    let profileNote = '';
+    if (state.view === 'lattice') {
+      const avail = activeProfiles();
+      if (avail.length > 1) profileNote = ' · Factory solid · Vendor dashed';
+    }
+    if (state.view === 'raw') {
+      label = 'Raw UV panel coordinates (px)';
+    } else if (state.view === 'lattice') {
+      label = state.placement === 'panel'
+        ? 'Lattice on panel (u, v) px — dashed reference grid is illustrative, not measured optics' + profileNote
+        : 'Exploratory ray placement: X/(-Z), Y/(-Z) — dashed reference grid is illustrative, not measured optics' + profileNote;
+    } else {
+      label = state.projection === 'xy' ? 'Raw X / Y (arbitrary units)' : 'Exploratory X/(-Z), Y/(-Z) — origin unverified';
+    }
+
+    const captionFont = '11px ' + getCss('--font-body');
+    ctx.font = captionFont;
+    const labelLines = measureWrapLines(ctx, label, innerW);
+    const lineHeight = 14;
+    const captionVPad = 6;
+    const captionBand = labelLines.length * lineHeight + pad + captionVPad * 2;
+    const plotH = Math.max(80, innerH - captionBand);
+
+    const rangeX = (x1 - x0) || 1;
+    const rangeY = (y1 - y0) || 1;
+    const scale = Math.min(innerW / rangeX, plotH / rangeY);
+    const offX = pad + (innerW - rangeX * scale) / 2 - x0 * scale;
+    const offY = pad + (plotH - rangeY * scale) / 2 - y0 * scale;
+
+    const result = { x0, x1, y0, y1, rangeX, rangeY, scale, offX, offY, plotH, innerW, innerH, pad, captionBand, labelLines, lineHeight, captionVPad, captionFont };
+    paneBaseCache.map.set(eye, result);
+    return result;
+  }
+
+  function drawPaneChrome(ctx, eye, px, py, pw, ph, base, ranges, profs, channels) {
+    ctx.fillStyle = getCss('--panel');
+    ctx.fillRect(0, 0, pw, ph);
+
+    ctx.strokeStyle = getCss('--border');
+    ctx.lineWidth = 1;
+    ctx.strokeRect(base.pad, base.pad, base.innerW, base.plotH);
+
+    ctx.fillStyle = getCss('--text');
+    ctx.font = '600 13px ' + getCss('--font-body');
+    ctx.fillText(EYE_LABELS[eye] || eye, base.pad, base.pad - 10);
+
+    const captionTop = base.pad + base.plotH;
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = getCss('--muted');
+    ctx.font = base.captionFont;
+    for (let i = 0; i < base.labelLines.length; i++) {
+      const y = captionTop + base.captionVPad + i * base.lineHeight;
+      ctx.fillText(base.labelLines[i], base.pad, y);
+    }
+    ctx.globalAlpha = 1;
+    drawLegend(ctx, eye, base, profs, channels, ranges.zmin, ranges.zmax, ranges.dmin, ranges.dmax);
+  }
+
+  function drawPane(ctx, eye, px, py, pw, ph, fast) {
+    const profs = activeProfiles();
+    const channels = activeChannels();
+
+    ctx.save();
+    ctx.translate(px, py);
+
+    const base = computePaneBase(eye, pw, ph);
+    const pv = paneViews[eye];
+    pv.baseScale = base.scale;
+    pv.baseOffX = base.offX;
+    pv.baseOffY = base.offY;
+    pv.rangeX = base.rangeX;
+    pv.rangeY = base.rangeY;
+
+    const toScreen = (x, y) => {
+      const bx = base.offX + x * base.scale;
+      const by = base.offY + y * base.scale;
+      return {
+        x: pv.panX + pv.zoom * (bx - pw / 2) + pw / 2,
+        y: pv.panY + pv.zoom * (by - ph / 2) + ph / 2
+      };
+    };
+    screenMap = {
+      ox: pv.panX + pv.zoom * (base.offX - pw / 2) + pw / 2,
+      oy: pv.panY + pv.zoom * (base.offY - ph / 2) + ph / 2,
+      sx: pv.zoom * base.scale,
+      sy: pv.zoom * base.scale
+    };
+
+    const ranges = colorRanges(eye, profs, channels);
+    drawPaneChrome(ctx, eye, px, py, pw, ph, base, ranges, profs, channels);
+
+    const zmin = ranges.zmin, zmax = ranges.zmax;
+    const size = +state.pointSize;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(base.pad, base.pad, base.innerW, base.plotH);
+    ctx.clip();
+
+    if (fast) {
+      // Interaction preview: reuse the bitmap captured before the gesture and
+      // apply the pan/zoom delta as an affine blit, so a drag costs one
+      // drawImage instead of redrawing 69 000 markers. The settle render at
+      // gesture end repaints at full quality.
+      const sv = snap.views[eye];
+      const r = pv.zoom / sv.zoom;
+      const dpr = snap.dpr;
+      const sx = px + base.pad, sy = py + base.pad;
+      ctx.translate(pw / 2 + pv.panX - r * sv.panX, ph / 2 + pv.panY - r * sv.panY);
+      ctx.scale(r, r);
+      ctx.translate(-pw / 2, -ph / 2);
+      ctx.translate(-px, -py);
+      ctx.drawImage(snap.canvas, sx * dpr, sy * dpr, base.innerW * dpr, base.plotH * dpr, sx, sy, base.innerW, base.plotH);
+    } else {
+      ctx.globalAlpha = +state.opacity;
+      primOX = px;
+      primOY = py;
+      if (state.view === 'diff') {
+        drawDiff(ctx, eye, toScreen, size, zmin, zmax);
+      } else if (state.view === 'raw') {
+        drawRaw(ctx, eye, profs, channels, toScreen, size, zmin, zmax);
+      } else if (state.view === 'grid') {
+        drawMappedGrid(ctx, eye, profs, channels, toScreen, size, zmin, zmax);
+      } else if (state.view === 'lattice') {
+        drawLattice(ctx, eye, profs, channels, toScreen, size, zmin, zmax);
+      } else {
+        drawPoints(ctx, eye, profs, channels, toScreen, size, zmin, zmax);
+      }
+      if (selected && selected.eye === eye) {
+        drawSelectionHighlight(ctx, selected, toScreen, base);
+      }
+      primOX = 0;
+      primOY = 0;
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.restore();
+    ctx.restore();
+  }
+
+  function drawSelectionHighlight(ctx, sel, toScreen, base) {
+    let s = null;
+    if (sel.type === 'diff') {
+      s = toScreen(sel.pair.factory.u, sel.pair.factory.v);
+    } else if (state.view === 'lattice') {
+      if (sel.lattice && sel.latticeX != null) s = toScreen(sel.latticeX, sel.latticeY);
+    } else if (state.view === 'raw') {
+      s = toScreen(sel.cell.u, sel.cell.v);
+    } else {
+      const pt = projectionPoint(sel.cell, sel.channel);
+      if (pt && pt.valid) s = toScreen(pt.x, pt.y);
+    }
+    if (!s) return;
+    ctx.strokeStyle = '#facc15';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 10, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  function drawLegend(ctx, eye, base, profs, channels, zmin, zmax, diffMagMin, diffMagMax) {
+    if (state.colorBy !== 'diffmag' && state.colorBy !== 'z') return;
+    let title, minVal = null, maxVal = null;
+    if (state.colorBy === 'diffmag') {
+      title = '|ΔXYZ| magnitude';
+      minVal = diffMagMin; maxVal = diffMagMax;
+    } else {
+      title = 'Raw Z value';
+      minVal = zmin; maxVal = zmax;
+    }
+    if (minVal === null || maxVal === null || minVal === maxVal) return;
+
+    const legendW = 140;
+    const legendH = 12;
+    const left = base.pad;
+    const top = base.pad + base.plotH + base.captionVPad + base.labelLines.length * base.lineHeight + 4;
+
+    ctx.save();
+    for (let i = 0; i <= legendW; i++) {
+      const t = i / legendW;
+      const hue = state.colorBy === 'diffmag' ? (1 - t) * 260 : (1 - t) * 220;
+      ctx.fillStyle = 'hsl(' + hue + ', 85%, 55%)';
+      ctx.fillRect(left + i, top, 1, legendH);
+    }
+    ctx.fillStyle = getCss('--muted');
+    ctx.font = '10px ' + getCss('--font-body');
+    ctx.fillText(fmtDec(minVal), left, top + legendH + 10);
+    ctx.fillText(title, left + legendW / 2 - ctx.measureText(title).width / 2, top + legendH + 10);
+    ctx.fillText(fmtDec(maxVal), left + legendW - ctx.measureText(fmtDec(maxVal)).width, top + legendH + 10);
+    ctx.restore();
+  }
+
+  function geometryKey() {
+    return [state.eye, state.profile, state.channel, state.view, state.placement, state.latticeStride].join('|');
+  }
+
+  function ensureGeometry() {
+    const key = geometryKey();
+    if (geometryCache.key === key && geometryCache.data) return geometryCache.data;
+    const data = buildGeometry();
+    geometryCache = { key: key, data: data };
+    return data;
+  }
+
+  function buildGeometry() {
+    const geom = { left: null, right: null };
+    const eyes = state.eye === 'both' ? ['left', 'right'] : [state.eye];
+    const profs = activeProfiles();
+    const channels = activeChannels();
+    for (const eye of eyes) {
+      const firstProf = profs.find(p => processed.profiles[p] && processed.profiles[p][eye]) || profs[0];
+      if (!firstProf) continue;
+      const side = processed.profiles[firstProf][eye];
+      if (!side) continue;
+      const w = side.width_px || 1;
+      const h = side.height_px || 1;
+      const cols = Math.max(1, side.cols || 1);
+      const rows = Math.max(1, side.rows || 1);
+
+      const cellMaps = {};
+      for (const pname of profs) {
+        const pside = processed.profiles[pname]?.[eye];
+        if (!pside || !Array.isArray(pside.cells)) continue;
+        const map = new Map();
+        for (const c of pside.cells) {
+          if (c.gx != null && c.gy != null) map.set(c.gx + '|' + c.gy, c);
+        }
+        cellMaps[pname] = map;
+      }
+
+      function refPos(c) {
+        const tx = cols > 1 ? c.gx / (cols - 1) : 0.5;
+        const ty = rows > 1 ? c.gy / (rows - 1) : 0.5;
+        return { x: -w / 2 + tx * w, y: -h / 2 + ty * h };
+      }
+
+      const stride = Math.max(1, state.latticeStride || 1);
+      function included(i, count) {
+        return i % stride === 0 || i === count - 1;
+      }
+
+      let panelX0 = -w / 2, panelX1 = w / 2, panelY0 = -h / 2, panelY1 = h / 2;
+      if (state.placement === 'panel') {
+        const uv = uvBounds(eye);
+        if (uv) { panelX0 = uv.x0; panelX1 = uv.x1; panelY0 = uv.y0; panelY1 = uv.y1; }
+      }
+      const panelW = (panelX1 - panelX0) || 1;
+      const panelH = (panelY1 - panelY0) || 1;
+
+      const refSegments = [];
+      for (let gy = 0; gy < rows; gy++) {
+        if (!included(gy, rows)) continue;
+        for (let gx = 0; gx < cols - 1; gx++) {
+          const ay = panelY0 + (rows > 1 ? gy / (rows - 1) : 0.5) * panelH;
+          refSegments.push({
+            x1: panelX0 + (cols > 1 ? gx / (cols - 1) : 0.5) * panelW, y1: ay,
+            x2: panelX0 + (cols > 1 ? (gx + 1) / (cols - 1) : 0.5) * panelW, y2: ay
+          });
+        }
+      }
+      for (let gx = 0; gx < cols; gx++) {
+        if (!included(gx, cols)) continue;
+        for (let gy = 0; gy < rows - 1; gy++) {
+          const ax = panelX0 + (cols > 1 ? gx / (cols - 1) : 0.5) * panelW;
+          refSegments.push({
+            x1: ax, y1: panelY0 + (rows > 1 ? gy / (rows - 1) : 0.5) * panelH,
+            x2: ax, y2: panelY0 + (rows > 1 ? (gy + 1) / (rows - 1) : 0.5) * panelH
+          });
+        }
+      }
+
+      let rminX = Infinity, rmaxX = -Infinity, rminY = Infinity, rmaxY = -Infinity;
+      if (state.placement === 'ray') {
+        for (const pname of profs) {
+          const cells = processed.profiles[pname]?.[eye]?.cells || [];
+          for (const c of cells) {
+            for (const ch of channels) {
+              const d = c.derived[ch];
+              if (!d || !d.ratio.valid) continue;
+              rminX = Math.min(rminX, d.ratio.x); rmaxX = Math.max(rmaxX, d.ratio.x);
+              rminY = Math.min(rminY, d.ratio.y); rmaxY = Math.max(rmaxY, d.ratio.y);
+            }
+          }
+        }
+        if (!Number.isFinite(rminX)) { rminX = -1; rmaxX = 1; rminY = -1; rmaxY = 1; }
+      }
+
+      function samplePos(c, ch) {
+        if (state.placement === 'panel') {
+          return { x: c.u, y: c.v, rawRatio: null, valid: true };
+        }
+        const d = c.derived[ch];
+        if (!d || !d.ratio.valid) return null;
+        const dx = (rmaxX - rminX) || 1;
+        const dy = (rmaxY - rminY) || 1;
+        return {
+          x: -w / 2 + (d.ratio.x - rminX) / dx * w,
+          y: -h / 2 + (d.ratio.y - rminY) / dy * h,
+          rawRatio: { x: d.ratio.x, y: d.ratio.y },
+          valid: true
+        };
+      }
+
+      const sampleLines = {};
+      const points = {};
+      const visiblePoints = {};
+      for (const pname of profs) {
+        sampleLines[pname] = { red: [], green: [], blue: [] };
+        points[pname] = { red: [], green: [], blue: [] };
+        visiblePoints[pname] = { red: [], green: [], blue: [] };
+        const map = cellMaps[pname];
+        if (!map) continue;
+        for (const c of map.values()) {
+          if (c.gx == null || c.gy == null) continue;
+          for (const ch of channels) {
+            const pos = samplePos(c, ch);
+            if (!pos || !pos.valid) continue;
+            points[pname][ch].push({ x: pos.x, y: pos.y, rawRatio: pos.rawRatio, cell: c });
+            if (included(c.gx, cols) && included(c.gy, rows)) {
+              visiblePoints[pname][ch].push({ x: pos.x, y: pos.y, rawRatio: pos.rawRatio, cell: c });
+            }
+            if (included(c.gy, rows)) {
+              const right = map.get((c.gx + 1) + '|' + c.gy);
+              if (right) {
+                const rpos = samplePos(right, ch);
+                if (rpos && rpos.valid) {
+                  sampleLines[pname][ch].push({ x1: pos.x, y1: pos.y, x2: rpos.x, y2: rpos.y, cell: c });
+                }
+              }
+            }
+            if (included(c.gx, cols)) {
+              const down = map.get(c.gx + '|' + (c.gy + 1));
+              if (down) {
+                const dpos = samplePos(down, ch);
+                if (dpos && dpos.valid) {
+                  sampleLines[pname][ch].push({ x1: pos.x, y1: pos.y, x2: dpos.x, y2: dpos.y, cell: c });
+                }
+              }
+            }
+          }
+        }
+      }
+
+      geom[eye] = { width_px: w, height_px: h, cols: cols, rows: rows, refSegments: refSegments, sampleLines: sampleLines, points: points, visiblePoints: visiblePoints, rminX: rminX, rmaxX: rmaxX, rminY: rminY, rmaxY: rmaxY };
+    }
+    return geom;
+  }
+
+  function toneColor(style, isVendor) {
+    if (!isVendor) return style;
+    const hexMatch = style.match(/^#([0-9a-f]{3,8})$/i);
+    if (hexMatch) {
+      let hex = hexMatch[1];
+      if (hex.length === 3 || hex.length === 4) hex = hex.split('').map(c => c + c).join('');
+      const r = parseInt(hex.slice(0, 2), 16) / 255;
+      const g = parseInt(hex.slice(2, 4), 16) / 255;
+      const b = parseInt(hex.slice(4, 6), 16) / 255;
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      let h = 0, s = 0, l = (max + min) / 2;
+      const d = max - min;
+      if (d) {
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+          case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+          case g: h = ((b - r) / d + 2) / 6; break;
+          case b: h = ((r - g) / d + 4) / 6; break;
+        }
+      }
+      s *= 0.72;
+      l *= 0.88;
+      return 'hsl(' + Math.round(h * 360) + ', ' + Math.round(s * 100) + '%, ' + Math.round(l * 100) + '%)';
+    }
+    const hslMatch = style.match(/^hsl\(\s*([\d.]+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%\s*\)$/i);
+    if (hslMatch) {
+      const h = +hslMatch[1], s = +hslMatch[2] * 0.72, l = +hslMatch[3] * 0.88;
+      return 'hsl(' + h + ', ' + s.toFixed(1) + '%, ' + l.toFixed(1) + '%)';
+    }
+    return style;
+  }
+
+
+  // Screen mapping for the current pane, split into origin + scale so the hot
+  // loops can transform coordinates with two multiply-adds instead of
+  // allocating a {x, y} object per sample.
+  let screenMap = { ox: 0, oy: 0, sx: 1, sy: 1 };
+  let dataVersion = 0;
+
+  const scratchPool = [];
+  function scratch(slot, n) {
+    let a = scratchPool[slot];
+    if (!a || a.length < n) a = scratchPool[slot] = new Float32Array(Math.ceil(n * 1.25) || 1);
+    return a;
+  }
+
+  // Mapped-grid geometry depends only on the data, projection and channel
+  // selection, never on pan or zoom, so it is built once instead of rebuilding
+  // a string-keyed Map of 69 000 entries on every frame.
+  let gridCache = { key: '', map: new Map() };
+
+  function mappedGrid(eye) {
+    const key = geometryKey() + '|' + state.projection + '|' + dataVersion;
+    if (gridCache.key !== key) gridCache = { key: key, map: new Map() };
+    if (gridCache.map.has(eye)) return gridCache.map.get(eye);
+    const profs = activeProfiles();
+    const channels = activeChannels();
+    const out = { profs: [], byProfile: {} };
+    for (const pname of profs) {
+      const side = processed.profiles[pname]?.[eye];
+      if (!side) continue;
+      const cols = Math.max(1, side.cols || 1);
+      const rows = Math.max(1, side.rows || 1);
+      const slot = new Int32Array(cols * rows).fill(-1);
+      const nodes = [];
+      for (const c of side.cells) {
+        if (c.gx == null || c.gy == null) continue;
+        if (c.gx < 0 || c.gx >= cols || c.gy < 0 || c.gy >= rows) continue;
+        const idx = c.gy * cols + c.gx;
+        if (slot[idx] !== -1) continue;
+        slot[idx] = nodes.length;
+        nodes.push(c);
+      }
+      const n = nodes.length;
+      const entry = { pname: pname, cols: cols, rows: rows, nodes: nodes, channels: {} };
+      for (const ch of channels) {
+        const xs = new Float64Array(n), ys = new Float64Array(n);
+        const right = new Int32Array(n).fill(-1);
+        const down = new Int32Array(n).fill(-1);
+        const valid = new Uint8Array(n);
+        for (let i = 0; i < n; i++) {
+          const pt = projectionPoint(nodes[i], ch);
+          if (!pt || !pt.valid) continue;
+          valid[i] = 1;
+          xs[i] = pt.x; ys[i] = pt.y;
+        }
+        for (let i = 0; i < n; i++) {
+          if (!valid[i]) continue;
+          const c = nodes[i];
+          if (c.gx + 1 < cols) {
+            const j = slot[c.gy * cols + c.gx + 1];
+            if (j >= 0 && valid[j]) right[i] = j;
+          }
+          if (c.gy + 1 < rows) {
+            const j = slot[(c.gy + 1) * cols + c.gx];
+            if (j >= 0 && valid[j]) down[i] = j;
+          }
+        }
+        entry.channels[ch] = { xs: xs, ys: ys, right: right, down: down, valid: valid };
+      }
+      out.byProfile[pname] = entry;
+      out.profs.push(pname);
+    }
+    gridCache.map.set(eye, out);
+    return out;
+  }
+
+  let diffCache = { key: '', map: new Map() };
+
+  function diffDeltas(eye) {
+    const key = geometryKey() + '|' + state.projection + '|' + dataVersion;
+    if (diffCache.key !== key) diffCache = { key: key, map: new Map() };
+    if (diffCache.map.has(eye)) return diffCache.map.get(eye);
+    const channels = activeChannels();
+    const pairs = processed.matched[eye] || [];
+    const out = { channels: channels, n: 0, baseX: [], baseY: [], dx: [], dy: [], mag: [], dmag: [], ch: [], pair: [], maxMag: 0 };
+    for (const pair of pairs) {
+      for (const ch of channels) {
+        const fpt = projectionPoint(pair.factory, ch);
+        const vpt = projectionPoint(pair.vendor, ch);
+        if (!fpt || !vpt || !fpt.valid || !vpt.valid) continue;
+        const dx = vpt.x - fpt.x;
+        const dy = vpt.y - fpt.y;
+        const mag = Math.hypot(dx, dy);
+        const dm = diffMagnitude(pair, ch) || 0;
+        if (mag > out.maxMag) out.maxMag = mag;
+        out.baseX.push(pair.factory.u);
+        out.baseY.push(pair.factory.v);
+        out.dx.push(dx);
+        out.dy.push(dy);
+        out.mag.push(mag);
+        out.dmag.push(dm);
+        out.ch.push(ch);
+        out.pair.push(pair);
+      }
+    }
+    out.n = out.ch.length;
+    diffCache.map.set(eye, out);
+    return out;
+  }
+
+  function drawLattice(ctx, eye, profs, channels, toScreen, size, zmin, zmax) {
+    const geom = ensureGeometry()[eye];
+    if (!geom) return;
+
+    ctx.save();
+
+    const baseAlpha = +state.opacity;
+
+    // Sample mesh — under the reference grid.
+    for (const pname of profs) {
+      const isVendor = pname === 'vendor';
+      ctx.lineWidth = isVendor ? 1.8 : 2.2;
+      ctx.globalAlpha = baseAlpha * (isVendor ? 0.55 : 0.98);
+      ctx.setLineDash(isVendor ? [8, 6] : []);
+      const profLines = geom.sampleLines[pname];
+      if (!profLines) continue;
+      for (const ch of channels) {
+        const segs = profLines[ch];
+        if (!segs || !segs.length) continue;
+        if (state.colorBy === 'z') {
+          for (const seg of segs) {
+            ctx.strokeStyle = toneColor(colorFor(seg.cell, ch, zmin, zmax), isVendor);
+            ctx.beginPath();
+            const a = toScreen(seg.x1, seg.y1);
+            const b = toScreen(seg.x2, seg.y2);
+            ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+          }
+        } else {
+          ctx.strokeStyle = toneColor(CHANNEL_COLORS[ch], isVendor);
+          ctx.beginPath();
+          for (const seg of segs) {
+            const a = toScreen(seg.x1, seg.y1);
+            const b = toScreen(seg.x2, seg.y2);
+            ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+          }
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Reference rectilinear grid drawn above the sample mesh.
+    ctx.lineWidth = 1.0;
+    ctx.strokeStyle = getCss('--muted');
+    ctx.globalAlpha = Math.min(baseAlpha, 0.28);
+    ctx.setLineDash([2, 5]);
+    ctx.beginPath();
+    for (const seg of geom.refSegments) {
+      const a = toScreen(seg.x1, seg.y1);
+      const b = toScreen(seg.x2, seg.y2);
+      ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+    }
+    ctx.stroke();
+
+    // Decimated sample dots (stride filters visibility, not hover/selection).
+    const dotSize = Math.max(1.0, size * 0.6);
+    ctx.globalAlpha = baseAlpha;
+    ctx.setLineDash([]);
+    for (const pname of profs) {
+      const profPoints = geom.points[pname];
+      const profVisible = geom.visiblePoints[pname];
+      if (!profPoints) continue;
+      for (const ch of channels) {
+        const pts = profPoints[ch];
+        if (!pts || !pts.length) continue;
+        ctx.fillStyle = CHANNEL_COLORS[ch];
+        const visible = profVisible ? profVisible[ch] : pts;
+        if (visible && visible.length) {
+          ctx.fillStyle = CHANNEL_COLORS[ch];
+          ctx.beginPath();
+          for (const pt of visible) {
+            const s = toScreen(pt.x, pt.y);
+            markerPath(ctx, s.x, s.y, dotSize, pname);
+          }
+          ctx.fill();
+        }
+        for (const pt of pts) {
+          const s = toScreen(pt.x, pt.y);
+          pushPrim(s.x, s.y, { type: 'point', eye: eye, profile: pname, channel: ch, cell: pt.cell, zmin: zmin, zmax: zmax, lattice: true, latticeX: pt.x, latticeY: pt.y, rawRatio: pt.rawRatio });
+        }
+      }
+    }
+
+    ctx.restore();
+  }
+
+  function markerPath(ctx, sx, sy, size, profile) {
+    if (profile === 'factory') {
+      ctx.moveTo(sx + size, sy);
+      ctx.arc(sx, sy, size, 0, Math.PI * 2);
+    } else {
+      ctx.rect(sx - size, sy - size, size * 2, size * 2);
+    }
+  }
+
+  function drawPoints(ctx, eye, profs, channels, toScreen, size, zmin, zmax) {
+    const batched = state.colorBy === 'channel';
+    for (const pname of profs) {
+      const cells = processed.profiles[pname][eye]?.cells || [];
+      for (const ch of channels) {
+        const fill = batched ? CHANNEL_COLORS[ch] : null;
+        if (batched) {
+          ctx.fillStyle = fill;
+          ctx.beginPath();
+        }
+        for (const c of cells) {
+          const pt = projectionPoint(c, ch);
+          if (!pt || !pt.valid) continue;
+          const s = toScreen(pt.x, pt.y);
+          if (batched) {
+            markerPath(ctx, s.x, s.y, size, pname);
+          } else {
+            ctx.fillStyle = colorFor(c, ch, zmin, zmax);
+            profileMarker(ctx, s.x, s.y, size, pname);
+          }
+          pushPrim(s.x, s.y, { type: 'point', eye: eye, profile: pname, channel: ch, cell: c, zmin: zmin, zmax: zmax });
+        }
+        if (batched) ctx.fill();
+      }
+    }
+  }
+
+  function drawMappedGrid(ctx, eye, profs, channels, toScreen, size, zmin, zmax) {
+    const grid = mappedGrid(eye);
+    const m = screenMap;
+    for (const pname of grid.profs) {
+      const entry = grid.byProfile[pname];
+      const nodes = entry.nodes;
+      const n = nodes.length;
+      if (!n) continue;
+      const batched = state.colorBy === 'channel';
+      ctx.lineWidth = 1;
+      const sx = scratch(0, n), sy = scratch(1, n);
+      for (const ch of channels) {
+        const cd = entry.channels[ch];
+        if (!cd) continue;
+        for (let i = 0; i < n; i++) {
+          if (!cd.valid[i]) continue;
+          sx[i] = m.ox + cd.xs[i] * m.sx;
+          sy[i] = m.oy + cd.ys[i] * m.sy;
+        }
+        if (batched) {
+          ctx.strokeStyle = CHANNEL_COLORS[ch];
+          ctx.beginPath();
+        }
+        for (let i = 0; i < n; i++) {
+          if (!cd.valid[i]) continue;
+          const r = cd.right[i], d = cd.down[i];
+          if (r < 0 && d < 0) continue;
+          if (!batched) {
+            ctx.strokeStyle = colorFor(nodes[i], ch, zmin, zmax);
+            ctx.beginPath();
+          }
+          if (r >= 0) { ctx.moveTo(sx[i], sy[i]); ctx.lineTo(sx[r], sy[r]); }
+          if (d >= 0) { ctx.moveTo(sx[i], sy[i]); ctx.lineTo(sx[d], sy[d]); }
+          if (!batched) ctx.stroke();
+        }
+        if (batched) ctx.stroke();
+      }
+      for (const ch of channels) {
+        const cd = entry.channels[ch];
+        if (!cd) continue;
+        for (let i = 0; i < n; i++) {
+          if (!cd.valid[i]) continue;
+          sx[i] = m.ox + cd.xs[i] * m.sx;
+          sy[i] = m.oy + cd.ys[i] * m.sy;
+        }
+        if (batched) {
+          ctx.fillStyle = CHANNEL_COLORS[ch];
+          ctx.beginPath();
+        }
+        for (let i = 0; i < n; i++) {
+          if (!cd.valid[i]) continue;
+          if (batched) markerPath(ctx, sx[i], sy[i], size, pname);
+          else {
+            ctx.fillStyle = colorFor(nodes[i], ch, zmin, zmax);
+            profileMarker(ctx, sx[i], sy[i], size, pname);
+          }
+          pushPrim(sx[i], sy[i], { type: 'point', eye: eye, profile: pname, channel: ch, cell: nodes[i], zmin: zmin, zmax: zmax });
+        }
+        if (batched) ctx.fill();
+      }
+    }
+  }
+
+  function drawRaw(ctx, eye, profs, channels, toScreen, size, zmin, zmax) {
+    const firstProf = profs[0] || 'factory';
+    const cells = processed.profiles[firstProf][eye]?.cells || [];
+    const map = new Map();
+    for (const c of cells) {
+      if (c.gx == null || c.gy == null) continue;
+      map.set(c.gx + '|' + c.gy, c);
+    }
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = getCss('--muted');
+    ctx.beginPath();
+    for (const c of cells) {
+      if (c.gx == null || c.gy == null) continue;
+      const s = toScreen(c.u, c.v);
+      const right = map.get((c.gx + 1) + '|' + c.gy);
+      const down = map.get(c.gx + '|' + (c.gy + 1));
+      if (right) { ctx.moveTo(s.x, s.y); ctx.lineTo(toScreen(right.u, right.v).x, toScreen(right.u, right.v).y); }
+      if (down) { ctx.moveTo(s.x, s.y); ctx.lineTo(toScreen(down.u, down.v).x, toScreen(down.u, down.v).y); }
+    }
+    ctx.stroke();
+    for (const c of cells) {
+      const s = toScreen(c.u, c.v);
+      for (const ch of channels) {
+        const col = colorFor(c, ch, zmin, zmax);
+        ctx.fillStyle = col;
+        const offset = (state.channel === 'rgb') ? (ch === 'red' ? -2 : ch === 'blue' ? 2 : 0) : 0;
+        profileMarker(ctx, s.x + offset, s.y + offset, Math.max(1, size - 0.5), firstProf);
+        pushPrim(s.x + offset, s.y + offset, { type: 'point', eye: eye, profile: firstProf, channel: ch, cell: c, zmin: zmin, zmax: zmax });
+      }
+    }
+  }
+
+  function drawDiff(ctx, eye, toScreen, size, zmin, zmax) {
+    const d = diffDeltas(eye);
+    if (!d.n) return;
+    const n = d.n;
+    const m = screenMap;
+    let maxDiffMag = 0;
+    if (state.colorBy === 'diffmag') {
+      for (let i = 0; i < n; i++) if (d.dmag[i] > maxDiffMag) maxDiffMag = d.dmag[i];
+    }
+
+    const targetLen = 80;
+    const arrowScale = d.maxMag > 0 ? targetLen / d.maxMag : 0;
+    const bx = scratch(2, n), by = scratch(3, n), tx = scratch(4, n), ty = scratch(5, n);
+    for (let i = 0; i < n; i++) {
+      bx[i] = m.ox + d.baseX[i] * m.sx;
+      by[i] = m.oy + d.baseY[i] * m.sy;
+      tx[i] = bx[i] + d.dx[i] * arrowScale;
+      ty[i] = by[i] + d.dy[i] * arrowScale;
+    }
+
+    const head = 5;
+    for (const ch of activeChannels()) {
+      let any = false;
+      ctx.strokeStyle = CHANNEL_COLORS[ch];
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        if (d.ch[i] !== ch) continue;
+        ctx.moveTo(bx[i], by[i]);
+        ctx.lineTo(tx[i], ty[i]);
+        any = true;
+      }
+      if (any) ctx.stroke();
+
+      ctx.fillStyle = CHANNEL_COLORS[ch];
+      for (let i = 0; i < n; i++) {
+        if (d.ch[i] !== ch) continue;
+        const ang = Math.atan2(ty[i] - by[i], tx[i] - bx[i]);
+        ctx.beginPath();
+        ctx.moveTo(tx[i], ty[i]);
+        ctx.lineTo(tx[i] - head * Math.cos(ang - Math.PI / 6), ty[i] - head * Math.sin(ang - Math.PI / 6));
+        ctx.lineTo(tx[i] - head * Math.cos(ang + Math.PI / 6), ty[i] - head * Math.sin(ang + Math.PI / 6));
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      if (state.colorBy !== 'diffmag') {
+        ctx.beginPath();
+        for (let i = 0; i < n; i++) {
+          if (d.ch[i] !== ch) continue;
+          ctx.moveTo(bx[i] + Math.max(1.5, size * 0.6), by[i]);
+          ctx.arc(bx[i], by[i], Math.max(1.5, size * 0.6), 0, Math.PI * 2);
+        }
+        ctx.fill();
+      }
+    }
+
+    if (state.colorBy === 'diffmag') {
+      for (let i = 0; i < n; i++) {
+        const t = maxDiffMag > 0 ? Math.max(0, Math.min(1, d.dmag[i] / maxDiffMag)) : 0;
+        const hue = (1 - t) * 260;
+        ctx.fillStyle = 'hsl(' + hue + ', 85%, 55%)';
+        ctx.beginPath();
+        ctx.arc(bx[i], by[i], Math.max(2, size), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    for (let i = 0; i < n; i++) {
+      pushPrim(bx[i], by[i], { type: 'diff', eye: eye, channel: d.ch[i], pair: d.pair[i], dx: d.dx[i], dy: d.dy[i], mag: d.mag[i], dmag: d.dmag[i] });
+    }
+
+    ctx.fillStyle = getCss('--muted');
+    ctx.font = '11px ' + getCss('--font-body');
+    ctx.fillText('Arrows scaled for visibility; lengths are not to physical scale.', 28, 46);
+  }
+
+  function layout() {
+    const size = wrapSize || measureWrap();
+    const cssW = Math.max(320, size.w);
+    const cssH = Math.max(360, size.h);
+    const eyes = state.eye === 'both' ? ['left', 'right'] : [state.eye];
+    const pad = 12;
+    const paneW = (cssW - pad * (eyes.length + 1)) / eyes.length;
+    const paneH = cssH - pad * 2;
+    return { cssW: cssW, cssH: cssH, eyes: eyes, pad: pad, paneW: paneW, paneH: paneH };
+  }
+
+  function paneRect(eye) {
+    const L = layout();
+    const i = L.eyes.indexOf(eye);
+    if (i < 0) return null;
+    return { eye: eye, px: L.pad + i * (L.paneW + L.pad), py: L.pad, pw: L.paneW, ph: L.paneH, layout: L };
+  }
+
+  function render() {
+    if (!ctx || !processed) return;
+    // A full repaint always supersedes any pending preview paint.
+    fastMode = false;
+    clearTimeout(settleTimer);
+    primeTheme();
+    const dpr = window.devicePixelRatio || 1;
+    const L = layout();
+    const cssW = L.cssW;
+    const cssH = L.cssH;
+    const bw = Math.round(cssW * dpr);
+    const bh = Math.round(cssH * dpr);
+    if (canvas.width !== bw) canvas.width = bw;
+    if (canvas.height !== bh) canvas.height = bh;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
+    primCount = 0;
+    for (let i = 0; i < L.eyes.length; i++) {
+      clampPan(L.eyes[i]);
+      drawPane(ctx, L.eyes[i], L.pad + i * (L.paneW + L.pad), L.pad, L.paneW, L.paneH, false);
+    }
+    buildHitIndex(cssW, cssH);
+    renderCount++;
+    updateZoomReadout();
+    lastRenderViews = snapshotViews();
+    snap = null;
+    lastPaintFast = false;
+    lastPaintSig = viewSignature();
+  }
+
+  // Interaction fast path -----------------------------------------------------
+  // A full repaint costs 30-290 ms at high resolutions, so a drag or wheel
+  // zoom paints the previously rendered bitmap with the view delta applied and
+  // only repaints for real once the gesture settles.
+  let snap = null;
+  let snapCanvas = null;
+  let fastMode = false;
+  let settleTimer = 0;
+  let fastRaf = 0;
+  let lastInputAt = 0;
+  let lastPaintFast = false;
+  let lastPaintSig = '';
+  let lastRenderViews = null;
+  let pointerInside = false;
+
+  function snapshotViews() {
+    const L = layout();
+    const views = {};
+    for (const eye of ['left', 'right']) {
+      views[eye] = { panX: paneViews[eye].panX, panY: paneViews[eye].panY, zoom: paneViews[eye].zoom };
+    }
+    return { cssW: L.cssW, cssH: L.cssH, dpr: window.devicePixelRatio || 1, eyes: views };
+  }
+
+  function captureSnapshot() {
+    if (!lastRenderViews) return;
+    const v = lastRenderViews;
+    if (!snapCanvas) snapCanvas = document.createElement('canvas');
+    const c = snapCanvas;
+    snap = { canvas: c, views: {}, valid: false };
+    if (c.width !== canvas.width || c.height !== canvas.height) {
+      c.width = canvas.width;
+      c.height = canvas.height;
+    }
+    const g = c.getContext('2d');
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, c.width, c.height);
+    g.drawImage(canvas, 0, 0);
+    snap.cssW = v.cssW;
+    snap.cssH = v.cssH;
+    snap.dpr = v.dpr;
+    snap.valid = true;
+    for (const eye of ['left', 'right']) {
+      snap.views[eye] = { panX: v.eyes[eye].panX, panY: v.eyes[eye].panY, zoom: v.eyes[eye].zoom };
+    }
+  }
+
+  function startFastMode() {
+    fastMode = true;
+    lastInputAt = performance.now();
+    clearTimeout(settleTimer);
+  }
+
+  // Settle only after the gesture has really stopped: a slow full render at
+  // high resolution can outlast the debounce, and an unconditional timer
+  // would then repaint on every frame of an ongoing wheel gesture.
+  function endFastMode(delay) {
+    const idle = delay == null ? 140 : delay;
+    clearTimeout(settleTimer);
+    function settle() {
+      const waited = performance.now() - lastInputAt;
+      if (waited < idle - 4) {
+        settleTimer = setTimeout(settle, idle - waited);
+        return;
+      }
+      fastMode = false;
+      if (!(lastPaintSig === viewSignature() && !lastPaintFast) && !viewMatchesSnapshot()) {
+        snap = null;
+        render();
+      }
+      // Hover is suppressed while the preview is showing stale positions; refresh
+      // the bubble now that the canvas and the hit index are final.
+      if (pointerInside && hoverPos.x != null) inspectHover(hoverPos.x, hoverPos.y);
+    }
+    settleTimer = setTimeout(settle, idle);
+  }
+
+  function viewMatchesSnapshot() {
+    const L = layout();
+    if (!snap || !snap.valid || snap.cssW !== L.cssW || snap.cssH !== L.cssH) return false;
+    for (let i = 0; i < L.eyes.length; i++) {
+      const eye = L.eyes[i];
+      const sv = snap.views[eye];
+      const pv = paneViews[eye];
+      const r = pv.zoom / sv.zoom;
+      if (Math.abs(r - 1) > 0.01) return false;
+      if (Math.abs(pv.panX - r * sv.panX) > 1 || Math.abs(pv.panY - r * sv.panY) > 1) return false;
+    }
+    return true;
+  }
+
+  function viewSignature() {
+    const L = layout();
+    const parts = [L.cssW + 'x' + L.cssH];
+    for (let i = 0; i < L.eyes.length; i++) {
+      const eye = L.eyes[i];
+      const pv = paneViews[eye];
+      parts.push(eye + ':' + pv.zoom.toFixed(5) + ':' + pv.panX.toFixed(2) + ':' + pv.panY.toFixed(2));
+    }
+    return parts.join('|');
+  }
+
+  function scheduleFast() {
+    if (fastRaf) return;
+    fastRaf = requestAnimationFrame(function () {
+      fastRaf = 0;
+      paintFast();
+    });
+  }
+
+  function paintFast() {
+    if (!ctx || !processed) return;
+    const dpr = window.devicePixelRatio || 1;
+    const L = layout();
+    if (!snap || !snap.valid) {
+      if (!lastRenderViews || lastRenderViews.cssW !== L.cssW || lastRenderViews.cssH !== L.cssH || lastRenderViews.dpr !== dpr) {
+        render();
+        return;
+      }
+      captureSnapshot();
+    }
+    if (snap.cssW !== L.cssW || snap.cssH !== L.cssH || snap.dpr !== dpr) {
+      render();
+      return;
+    }
+    for (let i = 0; i < L.eyes.length; i++) {
+      const eye = L.eyes[i];
+      const pane = paneRect(eye);
+      const sv = snap.views[eye];
+      const pv = paneViews[eye];
+      const r = pv.zoom / sv.zoom;
+      const dx = pv.panX - r * sv.panX;
+      const dy = pv.panY - r * sv.panY;
+      if (Math.abs(dx) > pane.pw * 0.22 || Math.abs(dy) > pane.ph * 0.22 || r < 0.5 || r > 3) {
+        render();
+        return;
+      }
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, L.cssW, L.cssH);
+    overlay.style.display = 'none';
+    for (let i = 0; i < L.eyes.length; i++) {
+      drawPane(ctx, L.eyes[i], L.pad + i * (L.paneW + L.pad), L.pad, L.paneW, L.paneH, true);
+    }
+    renderCount++;
+    updateZoomReadout();
+  }
+
+  // One reusable object per recorded primitive: the previous version allocated
+  // 69 000 objects per frame, which dominated both the JS time and GC pauses.
+  function pushPrim(x, y, meta) {
+    let p = primitives[primCount];
+    if (!p) { p = {}; primitives[primCount] = p; }
+    p.sx = x + primOX;
+    p.sy = y + primOY;
+    p.type = meta.type || 'point';
+    p.eye = meta.eye;
+    p.profile = meta.profile;
+    p.channel = meta.channel;
+    p.cell = meta.cell;
+    p.pair = meta.pair;
+    p.dx = meta.dx;
+    p.dy = meta.dy;
+    p.mag = meta.mag;
+    p.dmag = meta.dmag;
+    p.zmin = meta.zmin;
+    p.zmax = meta.zmax;
+    p.lattice = meta.lattice === true;
+    p.latticeX = meta.latticeX;
+    p.latticeY = meta.latticeY;
+    p.rawRatio = meta.rawRatio;
+    primCount++;
+  }
+
+  // Uniform bucket grid over the canvas so a hover costs a 3x3 lookup instead
+  // of a 69 000-element linear scan.
+  function buildHitIndex(cssW, cssH) {
+    const cell = hitIndex.cell;
+    const cols = Math.ceil(cssW / cell) + 1;
+    const rows = Math.ceil(cssH / cell) + 1;
+    const buckets = new Array(cols * rows);
+    for (let i = 0; i < primCount; i++) {
+      const p = primitives[i];
+      const bx = (p.sx / cell) | 0;
+      const by = (p.sy / cell) | 0;
+      if (bx < 0 || by < 0 || bx >= cols || by >= rows) continue;
+      const idx = by * cols + bx;
+      const list = buckets[idx];
+      if (list) list.push(p); else buckets[idx] = [p];
+    }
+    hitIndex = { cell: cell, cols: cols, rows: rows, buckets: buckets };
+  }
+
+  // Colour ranges (raw Z, |dXYZ|) never change with pan or zoom; recomputing
+  // them inside the pane loop meant a Math.min(...array) over ~100 000 values
+  // on every frame.
+  function colorRanges(eye, profs, channels) {
+    const key = geometryKey() + '|' + state.colorBy;
+    if (rangeCache.key !== key) rangeCache = { key: key, map: new Map() };
+    if (rangeCache.map.has(eye)) return rangeCache.map.get(eye);
+    let zmin = null, zmax = null, dmin = null, dmax = null;
+    if (state.colorBy === 'z') {
+      for (const pname of profs) {
+        const cells = processed.profiles[pname]?.[eye]?.cells || [];
+        for (const c of cells) {
+          for (const ch of channels) {
+            const arr = c.raw[ch];
+            if (!arr || arr.length !== 3 || !Number.isFinite(arr[2])) continue;
+            if (zmin === null || arr[2] < zmin) zmin = arr[2];
+            if (zmax === null || arr[2] > zmax) zmax = arr[2];
+          }
+        }
+      }
+    } else if (state.colorBy === 'diffmag') {
+      for (const pair of (processed.matched[eye] || [])) {
+        for (const ch of channels) {
+          const dm = diffMagnitude(pair, ch);
+          if (dm == null || !Number.isFinite(dm)) continue;
+          if (dmin === null || dm < dmin) dmin = dm;
+          if (dmax === null || dm > dmax) dmax = dm;
+        }
+      }
+    }
+    const ranges = { zmin: zmin, zmax: zmax, dmin: dmin, dmax: dmax };
+    rangeCache.map.set(eye, ranges);
+    return ranges;
+  }
+
+  function updateZoomReadout() {
+    const eyes = layout().eyes;
+    const parts = eyes.map(function (eye) {
+      return (eye === 'left' ? 'L ' : 'R ') + paneViews[eye].zoom.toFixed(2) + '×';
+    });
+    zoomReadout.textContent = parts.join(' · ');
+  }
+
+  function paneAt(x, y) {
+    const L = layout();
+    for (let i = 0; i < L.eyes.length; i++) {
+      const px = L.pad + i * (L.paneW + L.pad);
+      const py = L.pad;
+      if (x >= px && x <= px + L.paneW && y >= py && y <= py + L.paneH) {
+        return { eye: L.eyes[i], px: px, py: py, pw: L.paneW, ph: L.paneH, layout: L };
+      }
+    }
+    return null;
+  }
+
+  function findPrimitive(cssX, cssY) {
+    const r = 14;
+    const cell = hitIndex.cell;
+    const bx = (cssX / cell) | 0;
+    const by = (cssY / cell) | 0;
+    let best = null, bestD = (r + 2) * (r + 2);
+    for (let gy = by - 1; gy <= by + 1; gy++) {
+      if (gy < 0 || gy >= hitIndex.rows) continue;
+      for (let gx = bx - 1; gx <= bx + 1; gx++) {
+        if (gx < 0 || gx >= hitIndex.cols) continue;
+        const list = hitIndex.buckets[gy * hitIndex.cols + gx];
+        if (!list) continue;
+        for (let i = 0; i < list.length; i++) {
+          const p = list[i];
+          const dx = p.sx - cssX;
+          const dy = p.sy - cssY;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < bestD) { bestD = d2; best = p; }
+        }
+      }
+    }
+    return best;
+  }
+
+  function rawPlacementPoint(p) {
+    const cell = p.type === 'diff' ? p.pair.factory : p.cell;
+    if (state.view === 'raw') return { x: cell.u, y: cell.v };
+    if (state.view === 'lattice') {
+      const ch = p.channel || (state.channel === 'rgb' ? 'green' : state.channel);
+      if (p.lattice) return { x: p.latticeX, y: p.latticeY };
+      const geom = ensureGeometry()[p.eye];
+      if (!geom) return null;
+      const profPts = geom.points[p.profile || 'factory'];
+      if (!profPts) return null;
+      for (const item of (profPts[ch] || [])) {
+        if (item.cell.key === cell.key) return { x: item.x, y: item.y };
+      }
+      return { x: cell.u, y: cell.v };
+    }
+    const ch = p.channel || (state.channel === 'rgb' ? 'green' : state.channel);
+    const pt = projectionPoint(cell, ch);
+    if (pt && pt.valid) return { x: pt.x, y: pt.y };
+    return null;
+  }
+
+  function placeOverlay(x, y) {
+    const pane = (x != null && y != null) ? paneAt(x, y) : null;
+    if (pane) {
+      overlay.style.left = (pane.px + pane.pw / 2) + 'px';
+      overlay.style.top = (pane.py + 38) + 'px';
+    } else {
+      overlay.style.left = '50%';
+      overlay.style.top = '.75rem';
+    }
+  }
+
+  function inspectPoint(p) {
+    const c = p.type === 'diff' ? p.pair.factory : p.cell;
+    const lines = [];
+    lines.push('<div class="info-grid">');
+    lines.push('<dt>Eye</dt><dd>' + (p.eye === 'left' ? 'Left' : 'Right') + '</dd>');
+    lines.push('<dt>UV</dt><dd>' + fmtDec(c.u) + ', ' + fmtDec(c.v) + ' px</dd>');
+    if (Number.isInteger(c.id_x) && Number.isInteger(c.id_y)) {
+      lines.push('<dt>Grid ID</dt><dd>' + c.id_x + ', ' + c.id_y + '</dd>');
+    }
+    if (p.type === 'diff') {
+      lines.push('<dt>View</dt><dd>Factory-vendor difference (' + p.channel + ')</dd>');
+      lines.push('<dt>Delta raw</dt><dd>' + fmt(p.dx) + ', ' + fmt(p.dy) + '</dd>');
+      lines.push('<dt>Magnitude</dt><dd>' + fmt(p.mag) + '</dd>');
+      if (Number.isFinite(p.dmag)) lines.push('<dt>|ΔXYZ|</dt><dd>' + fmt(p.dmag) + '</dd>');
+      lines.push('</div>');
+      lines.push('<div class="info-grid" style="margin-top:.75rem;">');
+      for (const pname of ['factory', 'vendor']) {
+        const cell = p.pair[pname];
+        const arr = cell.raw[p.channel];
+        if (arr) {
+          const proj = projectionPoint(cell, p.channel);
+          lines.push('<dt>' + pname + ' XYZ</dt><dd>[' + fmt(arr[0]) + ', ' + fmt(arr[1]) + ', ' + fmt(arr[2]) + ']</dd>');
+          if (proj && proj.valid) {
+            lines.push('<dt>' + pname + ' ' + (state.projection === 'xy' ? 'X/Y' : 'X/(-Z),Y/(-Z)') + '</dt><dd>' + fmt(proj.x) + ', ' + fmt(proj.y) + '</dd>');
+          }
+        }
+      }
+      lines.push('</div>');
+    } else {
+      if (state.view === 'lattice') {
+        lines.push('<dt>Placement</dt><dd>' + (state.placement === 'panel' ? 'Panel (u, v) — stored sample pixel position' : 'Ray (X/-Z, Y/-Z) normalized to panel extent — coordinate frame unverified') + '</dd>');
+        if (state.placement === 'ray' && p.rawRatio) {
+          lines.push('<dt>Normalized position</dt><dd>' + fmtDec(p.latticeX) + ', ' + fmtDec(p.latticeY) + ' px-equivalent</dd>');
+          lines.push('<dt>Raw ratio</dt><dd>' + fmt(p.rawRatio.x) + ', ' + fmt(p.rawRatio.y) + '</dd>');
+        }
+      }
+      const proflist = (state.profile === 'both' && activeProfiles().length > 1) ? activeProfiles() : [p.profile];
+      for (const pname of proflist) {
+        const side = processed.profiles[pname][p.eye];
+        const cell = side?.cells.find(cc => cc.key === c.key) || c;
+        const arr = cell.raw[p.channel];
+        lines.push('<dt>Profile</dt><dd>' + pname + '</dd>');
+        if (arr) {
+          const proj = projectionPoint(cell, p.channel);
+          lines.push('<dt>' + p.channel + ' XYZ</dt><dd>[' + fmt(arr[0]) + ', ' + fmt(arr[1]) + ', ' + fmt(arr[2]) + ']</dd>');
+          if (proj && proj.valid) {
+            lines.push('<dt>' + (state.projection === 'xy' ? 'Raw X/Y' : 'Exploratory X/(-Z),Y/(-Z)') + '</dt><dd>' + fmt(proj.x) + ', ' + fmt(proj.y) + '</dd>');
+          }
+        }
+      }
+      lines.push('</div>');
+    }
+    lines.push('<p class="info-note">XYZ units and semantics are unconfirmed. X/(-Z), Y/(-Z) is exploratory; origin and convention are unverified. Do not interpret as degrees or FOV.</p>');
+    inspect.innerHTML = lines.join('');
+
+    overlay.style.display = 'block';
+    overlay.textContent = (p.eye === 'left' ? 'Left' : 'Right') + ' ' + (p.type === 'diff' ? 'Δ' : p.channel) + ' @ ' + fmtDec(c.u) + ', ' + fmtDec(c.v);
+    placeOverlay(hoverPos.x, hoverPos.y);
+  }
+
+  function inspectHover(x, y) {
+    const p = findPrimitive(x, y);
+    if (p) {
+      const c = p.type === 'diff' ? p.pair.factory : p.cell;
+      const placement = rawPlacementPoint(p);
+      let s = (p.eye === 'left' ? 'Left' : 'Right') + ' ' + (p.type === 'diff' ? 'Δ' : p.channel) + ' @ ' + fmtDec(c.u) + ', ' + fmtDec(c.v);
+      if (placement && placement.x != null) {
+        s += ' · placement ' + fmtDec(placement.x) + ', ' + fmtDec(placement.y);
+      }
+      if (p.type === 'diff' && Number.isFinite(p.dmag)) {
+        s += ' · |ΔXYZ| ' + fmt(p.dmag);
+      }
+      overlay.style.display = 'block';
+      overlay.textContent = s;
+      placeOverlay(hoverPos.x, hoverPos.y);
+    } else {
+      overlay.style.display = 'none';
+    }
+  }
+
+  function clearInspect() {
+    overlay.style.display = 'none';
+    inspect.innerHTML = 'Hover or tap a cell to inspect raw UV and stored XYZ values.';
+  }
+
+  function eventPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  function onPointerMove(e) {
+    const p = eventPos(e);
+    hoverPos = p;
+    pointerInside = true;
+    if (pointers.has(e.pointerId)) pointers.set(e.pointerId, p);
+
+    if (pinch && pointers.size >= 2) {
+      handlePinchMove();
+      return;
+    }
+
+    if (drag.active && e.pointerId === drag.pointerId) {
+      const dx = p.x - drag.lastX;
+      const dy = p.y - drag.lastY;
+      drag.lastX = p.x;
+      drag.lastY = p.y;
+      if (drag.mode === 'select') {
+        updateSelectionBox();
+        return;
+      }
+      if (!drag.moved && Math.hypot(p.x - drag.startX, p.y - drag.startY) > 3) drag.moved = true;
+      if (drag.moved) {
+        const pv = paneViews[drag.eye];
+        startFastMode();
+        pv.panX += dx;
+        pv.panY += dy;
+        clampPan(drag.eye);
+        scheduleFast();
+      }
+      return;
+    }
+
+    // Positions are stale while a fast paint is showing, so hover waits for settle.
+    if (fastMode) return;
+
+    if (!hoverRaf) {
+      hoverRaf = requestAnimationFrame(() => {
+        hoverRaf = 0;
+        if (selected) {
+          const hit = findPrimitive(hoverPos.x, hoverPos.y);
+          if (hit && (hit.sx !== selected.sx || hit.sy !== selected.sy || hit.channel !== selected.channel || hit.type !== selected.type)) {
+            inspectHover(hoverPos.x, hoverPos.y);
+          } else if (!hit) {
+            inspectHover(hoverPos.x, hoverPos.y);
+          }
+        } else {
+          inspectHover(hoverPos.x, hoverPos.y);
+        }
+      });
+    }
+  }
+
+  function onLeave() {
+    hoverPos = { x: null, y: null };
+    pointerInside = false;
+    if (!selected) clearInspect();
+  }
+
+  function onPointerDown(e) {
+    if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 1 && e.button !== 2) return;
+    const p = eventPos(e);
+    const pane = paneAt(p.x, p.y);
+    if (!pane) return;
+
+    pointers.set(e.pointerId, p);
+    if (pointers.size >= 2) {
+      startPinch();
+      e.preventDefault();
+      return;
+    }
+
+    drag.active = true;
+    drag.pointerId = e.pointerId;
+    drag.eye = pane.eye;
+    drag.button = e.button;
+    drag.mode = (e.button === 0 && e.shiftKey) ? 'select' : 'pan';
+    drag.startX = p.x;
+    drag.startY = p.y;
+    drag.lastX = p.x;
+    drag.lastY = p.y;
+    drag.moved = false;
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    canvas.classList.add('dragging');
+    try { canvas.focus({ preventScroll: true }); } catch (err) { canvas.focus(); }
+    if (drag.mode === 'select') {
+      selectionBox.style.display = 'block';
+      updateSelectionBox();
+    }
+    e.preventDefault();
+  }
+
+  function onPointerUp(e) {
+    const p = eventPos(e);
+    pointers.delete(e.pointerId);
+
+    if (pinch) {
+      if (pointers.size < 2) { pinch = null; endFastMode(0); }
+      if (e.pointerId === drag.pointerId) drag.active = false;
+      canvas.classList.remove('dragging');
+      return;
+    }
+
+    if (!drag.active || e.pointerId !== drag.pointerId) return;
+    drag.active = false;
+    canvas.classList.remove('dragging');
+    if (canvas.hasPointerCapture && canvas.hasPointerCapture(e.pointerId)) {
+      try { canvas.releasePointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    }
+
+    if (drag.mode === 'select') {
+      selectionBox.style.display = 'none';
+      const moved = Math.abs(p.x - drag.startX) > 2 || Math.abs(p.y - drag.startY) > 2;
+      if (moved) {
+        const pane = paneAt(drag.startX, drag.startY);
+        if (pane) {
+          selectRegion(pane, Math.min(drag.startX, p.x), Math.min(drag.startY, p.y), Math.max(drag.startX, p.x), Math.max(drag.startY, p.y));
+        }
+      }
+      return;
+    }
+
+    if (drag.moved) {
+      endFastMode(0);
+      return;
+    }
+    if (drag.button !== 0) return;
+
+    const hit = findPrimitive(p.x, p.y);
+    if (hit) {
+      selected = hit;
+      inspectPoint(hit);
+      render();
+    } else {
+      selected = null;
+      regionSamples = [];
+      clearInspect();
+      render();
+    }
+  }
+
+  function onPointerCancel(e) {
+    pointers.delete(e.pointerId);
+    if (pinch) { pinch = null; drag.active = false; }
+    if (e.pointerId === drag.pointerId) drag.active = false;
+    canvas.classList.remove('dragging');
+    selectionBox.style.display = 'none';
+  }
+
+  function startPinch() {
+    const ids = Array.from(pointers.keys()).slice(0, 2);
+    const a = pointers.get(ids[0]);
+    const b = pointers.get(ids[1]);
+    if (!a || !b) return;
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const pane = paneAt(mid.x, mid.y);
+    if (!pane) { pinch = null; return; }
+    drag.active = false;
+    selectionBox.style.display = 'none';
+    canvas.classList.remove('dragging');
+    pinch = {
+      ids: ids,
+      dist: Math.max(1, Math.hypot(b.x - a.x, b.y - a.y)),
+      mid: mid,
+      eye: pane.eye,
+      zoom0: paneViews[pane.eye].zoom,
+      panX0: paneViews[pane.eye].panX,
+      panY0: paneViews[pane.eye].panY
+    };
+  }
+
+  function handlePinchMove() {
+    if (!pinch) return;
+    const a = pointers.get(pinch.ids[0]);
+    const b = pointers.get(pinch.ids[1]);
+    if (!a || !b) return;
+    const pane = paneRect(pinch.eye);
+    if (!pane) return;
+    const pv = paneViews[pinch.eye];
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const dist = Math.max(1, Math.hypot(b.x - a.x, b.y - a.y));
+    const newZoom = clampZoom(pinch.zoom0 * (dist / pinch.dist));
+    const k = newZoom / pinch.zoom0;
+    const cx = pane.pw / 2;
+    const cy = pane.ph / 2;
+    const lx0 = pinch.mid.x - pane.px;
+    const ly0 = pinch.mid.y - pane.py;
+    const lx = mid.x - pane.px;
+    const ly = mid.y - pane.py;
+    pv.panX = (lx - cx) - k * ((lx0 - cx) - pinch.panX0);
+    pv.panY = (ly - cy) - k * ((ly0 - cy) - pinch.panY0);
+    pv.zoom = newZoom;
+    clampPan(pinch.eye);
+    startFastMode();
+    scheduleFast();
+  }
+
+  function updateSelectionBox() {
+    const x = Math.min(drag.startX, drag.lastX);
+    const y = Math.min(drag.startY, drag.lastY);
+    const w = Math.abs(drag.lastX - drag.startX);
+    const h = Math.abs(drag.lastY - drag.startY);
+    selectionBox.style.left = x + 'px';
+    selectionBox.style.top = y + 'px';
+    selectionBox.style.width = w + 'px';
+    selectionBox.style.height = h + 'px';
+  }
+
+  function selectRegion(pane, x1, y1, x2, y2) {
+    const channels = activeChannels();
+    const profs = activeProfiles();
+    const samples = [];
+    const seen = new Set();
+
+    function add(cell, ch, pname) {
+      const k = cell.key + '|' + ch + '|' + pname;
+      if (seen.has(k)) return;
+      seen.add(k);
+      const arr = cell.raw[ch];
+      const [rx, ry, rz] = arr;
+      const ratioMag = Math.hypot(rx / (-rz), ry / (-rz));
+      samples.push({
+        u: cell.u, v: cell.v,
+        id_x: cell.id_x, id_y: cell.id_y,
+        profile: pname, channel: ch,
+        red_x: cell.raw.red[0], red_y: cell.raw.red[1], red_z: cell.raw.red[2],
+        green_x: cell.raw.green[0], green_y: cell.raw.green[1], green_z: cell.raw.green[2],
+        blue_x: cell.raw.blue[0], blue_y: cell.raw.blue[1], blue_z: cell.raw.blue[2],
+        ratio_mag: ratioMag
+      });
+    }
+
+    let latticeIndex = null;
+    if (state.view === 'lattice' && state.placement === 'ray') {
+      const geom = ensureGeometry()[pane.eye];
+      latticeIndex = new Map();
+      if (geom) {
+        for (const pname of profs) {
+          const byCh = geom.points[pname];
+          if (!byCh) continue;
+          for (const ch of channels) {
+            for (const pt of (byCh[ch] || [])) latticeIndex.set(pname + '|' + ch + '|' + pt.cell.key, pt);
+          }
+        }
+      }
+    }
+
+    for (const pname of profs) {
+      const cells = processed.profiles[pname][pane.eye]?.cells || [];
+      for (const c of cells) {
+        for (const ch of channels) {
+          let sx, sy;
+          if (latticeIndex) {
+            const pt = latticeIndex.get(pname + '|' + ch + '|' + c.key);
+            if (!pt) continue;
+            sx = pt.x; sy = pt.y;
+          } else if (state.view === 'raw' || (state.view === 'lattice' && state.placement === 'panel')) {
+            sx = c.u; sy = c.v;
+          } else {
+            const pt = projectionPoint(c, ch);
+            if (!pt || !pt.valid) continue;
+            sx = pt.x; sy = pt.y;
+          }
+          const s = paneViewToScreen(pane.eye, sx, sy);
+          if (s.x >= x1 && s.x <= x2 && s.y >= y1 && s.y <= y2) {
+            add(c, ch, pname);
+          }
+        }
+      }
+    }
+
+    regionSamples = samples;
+    showRegionSummary(samples);
+    render();
+  }
+
+  function paneViewToScreen(eye, dataX, dataY) {
+    const pane = paneRect(eye);
+    if (!pane) return { x: NaN, y: NaN };
+    const base = computePaneBase(eye, pane.pw, pane.ph);
+    const pv = paneViews[eye];
+    const bx = base.offX + dataX * base.scale;
+    const by = base.offY + dataY * base.scale;
+    return {
+      x: pane.px + pv.panX + pv.zoom * (bx - pane.pw / 2) + pane.pw / 2,
+      y: pane.py + pv.panY + pv.zoom * (by - pane.ph / 2) + pane.ph / 2
+    };
+  }
+
+  function showRegionSummary(samples) {
+    if (!samples.length) {
+      inspect.innerHTML = '<p class="info-note">No samples in selection.</p>';
+      return;
+    }
+    const us = samples.map(s => s.u), vs = samples.map(s => s.v);
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    let sumX = 0, sumY = 0, sumZ = 0, minRatio = Infinity, maxRatio = -Infinity, sumRatio = 0;
+    let n = 0;
+    for (const s of samples) {
+      for (const ch of ['red', 'green', 'blue']) {
+        const x = s[ch + '_x'], y = s[ch + '_y'], z = s[ch + '_z'];
+        if (Number.isFinite(x)) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); sumX += x; }
+        if (Number.isFinite(y)) { minY = Math.min(minY, y); maxY = Math.max(maxY, y); sumY += y; }
+        if (Number.isFinite(z)) { minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z); sumZ += z; }
+        n++;
+      }
+      if (Number.isFinite(s.ratio_mag)) {
+        minRatio = Math.min(minRatio, s.ratio_mag);
+        maxRatio = Math.max(maxRatio, s.ratio_mag);
+        sumRatio += s.ratio_mag;
+      }
+    }
+    const html = [];
+    html.push('<div class="region-summary">');
+    html.push('<h3>Region selection (' + fmtInt(samples.length) + ' samples)</h3>');
+    html.push('<div class="info-grid">');
+    html.push('<dt>u range</dt><dd>' + fmtDec(Math.min(...us)) + ' … ' + fmtDec(Math.max(...us)) + '</dd>');
+    html.push('<dt>v range</dt><dd>' + fmtDec(Math.min(...vs)) + ' … ' + fmtDec(Math.max(...vs)) + '</dd>');
+    html.push('<dt>X min/max/mean</dt><dd>' + fmtDec(minX) + ' / ' + fmtDec(maxX) + ' / ' + fmtDec(sumX / n) + '</dd>');
+    html.push('<dt>Y min/max/mean</dt><dd>' + fmtDec(minY) + ' / ' + fmtDec(maxY) + ' / ' + fmtDec(sumY / n) + '</dd>');
+    html.push('<dt>Z min/max/mean</dt><dd>' + fmtDec(minZ) + ' / ' + fmtDec(maxZ) + ' / ' + fmtDec(sumZ / n) + '</dd>');
+    html.push('<dt>Ratio mag min/max/mean</dt><dd>' + fmtDec(minRatio) + ' / ' + fmtDec(maxRatio) + ' / ' + fmtDec(sumRatio / samples.length) + '</dd>');
+    html.push('</div>');
+    html.push('<div class="actions">');
+    html.push('<button type="button" id="btn-copy-csv">Copy CSV</button>');
+    html.push('<button type="button" id="btn-download-csv">Download CSV</button>');
+    html.push('</div>');
+    html.push('</div>');
+    html.push('<p class="info-note">XYZ units and frame are unproven. Ratio magnitude is exploratory.</p>');
+    inspect.innerHTML = html.join('');
+    document.getElementById('btn-copy-csv').addEventListener('click', () => copyCsv(samples));
+    document.getElementById('btn-download-csv').addEventListener('click', () => downloadCsv(samples));
+  }
+
+  function buildCsv(samples) {
+    const header = ['u','v','id_x','id_y','red_x','red_y','red_z','green_x','green_y','green_z','blue_x','blue_y','blue_z','ratio_mag'];
+    const rows = samples.map(s => [
+      s.u, s.v, s.id_x, s.id_y,
+      s.red_x, s.red_y, s.red_z,
+      s.green_x, s.green_y, s.green_z,
+      s.blue_x, s.blue_y, s.blue_z,
+      s.ratio_mag
+    ].map(v => (v === null || v === undefined || !Number.isFinite(v)) ? '' : ('' + v)).join(','));
+    return [header.join(','), ...rows].join('\n');
+  }
+
+  function copyCsv(samples) {
+    const csv = buildCsv(samples);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(csv).then(() => {
+        inspect.querySelector('.region-summary h3').textContent += ' — copied';
+      }).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = csv;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      });
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = csv;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+  }
+
+  function downloadCsv(samples) {
+    const csv = buildCsv(samples);
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'selected-samples-' + samples.length + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function clampZoom(z) {
+    return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
+  }
+
+  function scheduleRender() {
+    if (renderRaf) return;
+    renderRaf = requestAnimationFrame(function () {
+      renderRaf = 0;
+      render();
+    });
+  }
+
+  // Pan limits keep at least KEEP_VISIBLE px of the plotted content inside the
+  // plot rectangle, so a panel can never be dragged completely out of view.
+  function clampPan(eye) {
+    const pane = paneRect(eye);
+    if (!pane) return;
+    const base = computePaneBase(eye, pane.pw, pane.ph);
+    const pv = paneViews[eye];
+    const z = pv.zoom;
+    const cx = pane.pw / 2;
+    const cy = pane.ph / 2;
+    const left1 = base.offX + base.x0 * base.scale;
+    const right1 = base.offX + base.x1 * base.scale;
+    const top1 = base.offY + base.y0 * base.scale;
+    const bottom1 = base.offY + base.y1 * base.scale;
+    const plotL = base.pad;
+    const plotR = base.pad + base.innerW;
+    const plotT = base.pad;
+    const plotB = base.pad + base.plotH;
+    const loX = plotL + KEEP_VISIBLE - cx - z * (right1 - cx);
+    const hiX = plotR - KEEP_VISIBLE - cx - z * (left1 - cx);
+    const loY = plotT + KEEP_VISIBLE - cy - z * (bottom1 - cy);
+    const hiY = plotB - KEEP_VISIBLE - cy - z * (top1 - cy);
+    pv.panX = Math.min(hiX, Math.max(loX, pv.panX));
+    pv.panY = Math.min(hiY, Math.max(loY, pv.panY));
+  }
+
+  function zoomAt(cssX, cssY, factor, eye) {
+    const pane = eye ? paneRect(eye) : paneAt(cssX, cssY);
+    if (!pane) return;
+    const pv = paneViews[pane.eye];
+    const newZoom = clampZoom(pv.zoom * factor);
+    if (newZoom === pv.zoom) return;
+    const cx = cssX - pane.px - pane.pw / 2;
+    const cy = cssY - pane.py - pane.ph / 2;
+    const k = newZoom / pv.zoom;
+    startFastMode();
+    pv.panX = cx - k * (cx - pv.panX);
+    pv.panY = cy - k * (cy - pv.panY);
+    pv.zoom = newZoom;
+    clampPan(pane.eye);
+    scheduleFast();
+  }
+
+  function resetPane(eye) {
+    if (!paneViews[eye]) return;
+    paneViews[eye].zoom = 1;
+    paneViews[eye].panX = 0;
+    paneViews[eye].panY = 0;
+  }
+
+  function resetView() {
+    resetPane('left');
+    resetPane('right');
+    selected = null;
+    regionSamples = [];
+    fastMode = false;
+    clearTimeout(settleTimer);
+    render();
+  }
+
+  function onWheel(e) {
+    e.preventDefault();
+    const p = eventPos(e);
+    const unit = e.deltaMode === 1 ? 16 : (e.deltaMode === 2 ? 400 : 1);
+    const factor = Math.min(2, Math.max(0.5, Math.exp(-e.deltaY * unit * 0.0015)));
+    zoomAt(p.x, p.y, factor);
+    endFastMode(160);
+  }
+
+  function onDblClick(e) {
+    const p = eventPos(e);
+    if (e.shiftKey) {
+      const pane = paneAt(p.x, p.y);
+      if (pane) { resetPane(pane.eye); render(); }
+    } else {
+      zoomAt(p.x, p.y, 2);
+      endFastMode(0);
+    }
+  }
+
+  function onKey(e) {
+    if (e.key === 'Escape') {
+      selected = null;
+      regionSamples = [];
+      clearInspect();
+      render();
+      return;
+    }
+    if (!selected) return;
+    const eye = selected.eye;
+    const cell = selected.type === 'diff' ? selected.pair.factory : selected.cell;
+    const ch = selected.channel || (state.channel === 'rgb' ? 'green' : state.channel);
+    const side = processed.profiles[selected.profile || 'factory'][eye];
+    if (!side) return;
+    const map = new Map();
+    for (const c of side.cells) {
+      if (c.gx != null && c.gy != null) map.set(c.gx + '|' + c.gy, c);
+    }
+    let gx = cell.gx, gy = cell.gy;
+    if (gx == null || gy == null) return;
+    if (e.key === 'ArrowRight') gx++;
+    else if (e.key === 'ArrowLeft') gx--;
+    else if (e.key === 'ArrowUp') gy--;
+    else if (e.key === 'ArrowDown') gy++;
+    else return;
+    const next = map.get(gx + '|' + gy);
+    if (!next) return;
+    e.preventDefault();
+    selected = { type: 'point', eye: eye, profile: selected.profile || 'factory', channel: ch, cell: next };
+    inspectPoint(selected);
+    render();
+  }
+
+  function onResize() {
+    syncWrap();
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(render, 100);
+  }
+
+  function exportPng() {
+    const link = document.createElement('a');
+    link.download = 'optics-plot-' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.png';
+    link.href = canvas.toDataURL('image/png');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  function updateButtons() {
+    document.querySelectorAll('button[data-eye]').forEach(b => b.setAttribute('aria-pressed', b.dataset.eye === state.eye));
+    document.querySelectorAll('button[data-profile]').forEach(b => {
+      b.setAttribute('aria-pressed', b.dataset.profile === state.profile);
+    });
+    const hasVendor = !!processed.hasProfile.vendor;
+    document.getElementById('btn-vendor').disabled = !hasVendor;
+    document.getElementById('btn-both').disabled = !hasVendor;
+    if (!hasVendor && state.profile !== 'factory') { state.profile = 'factory'; updateButtons(); return; }
+    const canDiff = hasVendor && (processed.matched.left.length > 0 || processed.matched.right.length > 0);
+    document.getElementById('btn-diff').disabled = !canDiff;
+    if (state.view === 'diff' && !canDiff) { state.view = 'points'; updateButtons(); return; }
+    document.querySelectorAll('button[data-channel]').forEach(b => b.setAttribute('aria-pressed', b.dataset.channel === state.channel));
+    document.querySelectorAll('button[data-projection]').forEach(b => b.setAttribute('aria-pressed', b.dataset.projection === state.projection));
+    document.querySelectorAll('button[data-view]').forEach(b => b.setAttribute('aria-pressed', b.dataset.view === state.view));
+    document.querySelectorAll('button[data-placement]').forEach(b => {
+      b.setAttribute('aria-pressed', b.dataset.placement === state.placement);
+      b.disabled = state.view !== 'lattice';
+    });
+    document.querySelectorAll('button[data-stride]').forEach(b => {
+      b.setAttribute('aria-pressed', (+b.dataset.stride) === state.latticeStride);
+      b.disabled = state.view !== 'lattice';
+    });
+    document.querySelectorAll('button[data-colorby]').forEach(b => b.setAttribute('aria-pressed', b.dataset.colorby === state.colorBy));
+    const diffmagBtn = document.getElementById('btn-diffmag');
+    diffmagBtn.disabled = !canDiff || state.view !== 'diff';
+    if (state.colorBy === 'diffmag' && diffmagBtn.disabled) { state.colorBy = 'channel'; updateButtons(); return; }
+  }
+
+  function renderProvenance() {
+    let html = '';
+    for (const pname of ['factory', 'vendor']) {
+      const p = analysis.profiles[pname];
+      if (!p) continue;
+      html += '<div class="prof">';
+      html += '<strong>' + pname.charAt(0).toUpperCase() + pname.slice(1) + ' profile</strong><br>';
+      html += 'Source: <code>' + escapeHtml(p.source_path || '—') + '</code>';
+      html += 'Source SHA256: <code title="' + escapeHtml(p.source_sha256 || '') + '">' + escapeHtml((p.source_sha256 || '').slice(0, 24)) + '…</code>';
+      html += 'Block SHA256: <code title="' + escapeHtml(p.block_sha256 || '') + '">' + escapeHtml((p.block_sha256 || '').slice(0, 24)) + '…</code>';
+      const left = p.left, right = p.right;
+      if (left || right) {
+        html += '<span class="pill">';
+        if (left) html += 'L ' + left.cells.length + '/' + (left.rows * left.cols) + ' cells';
+        if (left && right) html += ' · ';
+        if (right) html += 'R ' + right.cells.length + '/' + (right.rows * right.cols) + ' cells';
+        html += '</span>';
+      }
+      html += '</div>';
+    }
+    provenance.innerHTML = html;
+  }
+
+  function escapeHtml(s) {
+    return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function renderLimitations() {
+    const defaults = [
+      'XYZ stored units and semantics are unconfirmed. Do not interpret values as angular distortion, FOV, or optical improvement.',
+      'The X/(-Z), Y/(-Z) ratio is purely exploratory; its origin, coordinate convention, and physical meaning are unverified.',
+      'Only matched factory and vendor cells (same grid position or UV) are compared. Missing or empty LUT blocks are ignored, not treated as a zero map.',
+      'This viewer does not modify, apply, or flash the original factory LUT.',
+      'This dataset does not include a through-lens photograph. The lattice is drawn on an ideal panel image plane; a lens or panel photo supplied later would be overlaid, not fabricated.'
+    ];
+    const list = Array.isArray(analysis.limitations) ? analysis.limitations.slice() : [];
+    for (const d of defaults) if (list.indexOf(d) < 0) list.push(d);
+    limitationsEl.innerHTML = list.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+  }
+
+  function updateMeta() {
+    genTime.textContent = analysis.__generated_at ? new Date(analysis.__generated_at).toLocaleString() : '—';
+    genTool.textContent = analysis.__generator || 'build_viewer.py';
+  }
+
+  function bindControls() {
+    document.querySelectorAll('button[data-eye]').forEach(b => b.addEventListener('click', () => { state.eye = b.dataset.eye; selected = null; regionSamples = []; updateButtons(); render(); }));
+    document.querySelectorAll('button[data-profile]').forEach(b => b.addEventListener('click', () => { if (b.disabled) return; state.profile = b.dataset.profile; selected = null; regionSamples = []; updateButtons(); render(); }));
+    document.querySelectorAll('button[data-channel]').forEach(b => b.addEventListener('click', () => { state.channel = b.dataset.channel; selected = null; regionSamples = []; updateButtons(); render(); }));
+    document.querySelectorAll('button[data-projection]').forEach(b => b.addEventListener('click', () => { state.projection = b.dataset.projection; selected = null; regionSamples = []; updateButtons(); render(); }));
+    document.querySelectorAll('button[data-view]').forEach(b => b.addEventListener('click', () => { if (b.disabled) return; state.view = b.dataset.view; selected = null; regionSamples = []; updateButtons(); render(); }));
+    document.querySelectorAll('button[data-placement]').forEach(b => b.addEventListener('click', () => { if (b.disabled) return; state.placement = b.dataset.placement; selected = null; regionSamples = []; updateButtons(); render(); }));
+    document.querySelectorAll('button[data-stride]').forEach(b => b.addEventListener('click', () => { if (b.disabled) return; state.latticeStride = +b.dataset.stride; selected = null; regionSamples = []; updateButtons(); render(); }));
+    document.querySelectorAll('button[data-colorby]').forEach(b => b.addEventListener('click', () => { if (b.disabled) return; state.colorBy = b.dataset.colorby; updateButtons(); render(); }));
+    document.getElementById('point-size').addEventListener('input', e => { state.pointSize = +e.target.value; render(); });
+    document.getElementById('opacity').addEventListener('input', e => { state.opacity = +e.target.value; render(); });
+    document.getElementById('json-file').addEventListener('change', async e => {
+      const f = e.target.files[0];
+      if (!f) return;
+      try {
+        const text = await f.text();
+        const newData = JSON.parse(text);
+        const err = validateIncoming(newData);
+        if (err) throw new Error(err);
+        analysis = newData;
+        processed = preprocess(analysis);
+        dataVersion++;
+        geometryCache = { key: '', data: null };
+        gridCache = { key: '', map: new Map() };
+        diffCache = { key: '', map: new Map() };
+        rangeCache = { key: '', map: new Map() };
+        resetView();
+        updateButtons();
+        renderProvenance();
+        renderLimitations();
+        updateMeta();
+        render();
+        inspect.innerHTML = '<p class="info-note">Loaded local file: ' + escapeHtml(f.name) + '</p>';
+      } catch (err) {
+        inspect.innerHTML = '<p class="fatal">Failed to load file: ' + escapeHtml(err.message) + '</p>';
+      }
+    });
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerleave', onLeave);
+    canvas.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerCancel);
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+    canvas.addEventListener('dblclick', onDblClick);
+    btnReset.addEventListener('click', resetView);
+    btnPng.addEventListener('click', exportPng);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('resize', onResize);
+    window.addEventListener('keydown', onViewKey);
+    if (typeof ResizeObserver === 'function') {
+      new ResizeObserver(syncWrap).observe(wrap);
+    } else {
+      syncWrap();
+    }
+  }
+
+  function onViewKey(e) {
+    if (e.target !== document.body && e.target !== canvas) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const L = layout();
+    const hovered = hoverPos.x != null ? paneAt(hoverPos.x, hoverPos.y) : null;
+    const eye = (hovered && hovered.eye) || L.eyes[0];
+    const pane = paneRect(eye);
+    if (!pane) return;
+    const cx = pane.px + pane.pw / 2;
+    const cy = pane.py + pane.ph / 2;
+    if (e.key === '+' || e.key === '=') {
+      zoomAt(cx, cy, 1.25, eye);
+      endFastMode(160);
+      e.preventDefault();
+    } else if (e.key === '-' || e.key === '_') {
+      zoomAt(cx, cy, 1 / 1.25, eye);
+      endFastMode(160);
+      e.preventDefault();
+    } else if (e.key === '0') {
+      resetView();
+      e.preventDefault();
+    }
+  }
+
+  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', render);
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
+
+  if (!parseData()) return;
+  const err = validateIncoming(analysis);
+  if (err) { fail(err); return; }
+  processed = preprocess(analysis);
+  bindControls();
+  updateButtons();
+  renderProvenance();
+  renderLimitations();
+  updateMeta();
+  render();
+
+  window.__viewerTest = {
+    getZoom: (eye) => paneViews[eye] && paneViews[eye].zoom,
+    getPan: (eye) => paneViews[eye] ? { x: paneViews[eye].panX, y: paneViews[eye].panY } : null,
+    getRegionCount: () => regionSamples.length,
+    getRegionCsv: () => regionSamples.length ? buildCsv(regionSamples) : '',
+    getSelected: () => selected ? { eye: selected.eye, channel: selected.channel, u: selected.cell ? selected.cell.u : (selected.pair ? selected.pair.factory.u : null) } : null,
+    captionMetrics: () => {
+      const L = layout();
+      ctx.save();
+      const result = [];
+      for (const eye of L.eyes) {
+        const base = computePaneBase(eye, L.paneW, L.paneH);
+        ctx.font = base.captionFont;
+        let maxLineWidth = 0;
+        for (const line of base.labelLines) {
+          maxLineWidth = Math.max(maxLineWidth, ctx.measureText(line).width);
+        }
+        const availableWidth = base.innerW;
+        const availableHeight = L.paneH - base.pad - base.plotH;
+        const fits = maxLineWidth <= availableWidth && base.captionBand + base.pad <= L.paneH;
+        result.push({ eye, paneW: L.paneW, paneH: L.paneH, availableWidth, maxLineWidth, lineCount: base.labelLines.length, lineHeight: base.lineHeight, captionBand: base.captionBand, availableHeight, fits });
+      }
+      ctx.restore();
+      return result;
+    },
+    captionFits: () => window.__viewerTest.captionMetrics().every(m => m.fits),
+    getRenderCount: () => renderCount,
+    timing: (n) => {
+      const count = Math.max(1, n || 1);
+      const t0 = performance.now();
+      for (let i = 0; i < count; i++) render();
+      return (performance.now() - t0) / count;
+    },
+    getPanes: () => layout().eyes.map(eye => {
+      const pane = paneRect(eye);
+      return { eye: eye, px: pane.px, py: pane.py, pw: pane.pw, ph: pane.ph };
+    }),
+    getPlot: (eye) => {
+      const pane = paneRect(eye);
+      if (!pane) return null;
+      const base = computePaneBase(eye, pane.pw, pane.ph);
+      return { x: pane.px + base.pad, y: pane.py + base.pad, w: base.innerW, h: base.plotH };
+    },
+    toCanvas: (eye, x, y) => paneViewToScreen(eye, x, y),
+    getPrimitives: (eye) => primitives.slice(0, primCount).filter(p => p.eye === eye).map(p => ({ sx: p.sx, sy: p.sy, channel: p.channel, type: p.type, u: p.cell ? p.cell.u : (p.pair ? p.pair.factory.u : null) })),
+    getView: () => ({ eye: state.eye, profile: state.profile, channel: state.channel, view: state.view, placement: state.placement })
+  };
+})();
+</script>
+</body>
+</html>
