@@ -30,6 +30,13 @@ import build_optics_module as bom  # noqa: E402
 
 _OMIT = object()
 
+# MSYS needs cygpath to translate Windows paths; Linux already passes POSIX
+# paths, so only convert when cygpath is actually available.
+_POSIX_PATH_HELPER = (
+    'to_posix() { if command -v cygpath >/dev/null 2>&1; then '
+    'cygpath -u "$1"; else printf %s "$1"; fi; }'
+)
+
 PREFIX = b"# mixed static profile fixture\n" + bytes(range(1, 41))
 BLOCK = (
     b"display_profile_v2 {\n"
@@ -386,9 +393,10 @@ class OpticsModuleTest(unittest.TestCase):
                 harness = "\n".join(
                     [
                         "set -u",
+                        _POSIX_PATH_HELPER,
                         f"TARGET={shlex.quote(target)}",
                         f"PAYLOAD={shlex.quote(payload)}",
-                        'GXR_MOUNTINFO=$(cygpath -u "$GXR_MOUNTINFO_WIN") || exit 9',
+                        'GXR_MOUNTINFO=$(to_posix "$GXR_MOUNTINFO_WIN") || exit 9',
                         f"payload_mount() {{\n{payload_mount}\n}}",
                         f"resolve_payload_identity() {{\n{resolve}\n}}",
                         "resolve_payload_identity || exit 1",
@@ -465,7 +473,8 @@ class OpticsModuleTest(unittest.TestCase):
                 harness = "\n".join(
                     [
                         "set -u",
-                        'PS_FIXTURE=$(cygpath -u "$PS_FIXTURE_WIN") || exit 9',
+                        _POSIX_PATH_HELPER,
+                        'PS_FIXTURE=$(to_posix "$PS_FIXTURE_WIN") || exit 9',
                         'ps_dump() { cat "$PS_FIXTURE"; }',
                         f"is_uint() {{\n{is_uint}\n}}",
                         f"pid_of_unique() {{\n{pid_of_unique}\n}}",
@@ -570,7 +579,8 @@ class OpticsModuleTest(unittest.TestCase):
                 harness = "\n".join(
                     [
                         "set -u",
-                        'MODDIR=$(cygpath -u "$GXR_MODDIR_WIN") || exit 9',
+                        _POSIX_PATH_HELPER,
+                        'MODDIR=$(to_posix "$GXR_MODDIR_WIN") || exit 9',
                         'PAYLOAD="$MODDIR/payload/device_profile.textproto"',
                         'BLOCK="$MODDIR/payload/display_profile.block"',
                         'TARGET="$MODDIR/stock.bin"',
@@ -637,6 +647,24 @@ class OpticsModuleTest(unittest.TestCase):
                     self.assertNotEqual(proc.returncode, 0, detail)
                     self.assertEqual(len(temps), 1, f"{name}: preexisting symlink vanished")
                     self.assertTrue((payload_dir / temps[0]).is_symlink())
+
+    def test_posix_path_helper_falls_back_without_cygpath(self) -> None:
+        bash = shutil.which("bash")
+        if not bash:
+            self.skipTest("bash not available")
+        proc = subprocess.run(
+            [bash],
+            input=_POSIX_PATH_HELPER + '\nto_posix "$GXR_TEST_PATH"\n',
+            text=True,
+            capture_output=True,
+            timeout=30,
+            env={**os.environ, "PATH": str(self.dir), "GXR_TEST_PATH": "/tmp/gxr-fixture"},
+        )
+        detail = (proc.stderr or "").strip()
+        if "windows subsystem" in detail.lower() or "wsl" in detail.lower():
+            self.skipTest(f"bash launcher unusable here: {detail[:120]}")
+        self.assertEqual(proc.returncode, 0, detail)
+        self.assertEqual(proc.stdout.strip(), "/tmp/gxr-fixture")
 
     def test_service_reports_only(self) -> None:
         _action, service = self._scripts()

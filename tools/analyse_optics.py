@@ -310,7 +310,8 @@ def extract_optical_block_hashes(path: Path) -> Tuple[bytes, str, str]:
     matching.  Rejects files with duplicate top-level display_profile_v2
     fields or any non-whitespace content outside the single optical block.
     """
-    text = path.read_text(encoding="utf-8", newline="")
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        text = handle.read()
     parser = TextProtoParser(text)
     tokens = parser._tokenize()
     display_indices = [
